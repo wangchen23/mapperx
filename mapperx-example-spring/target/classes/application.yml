@@ -1,0 +1,10 @@
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/sharding_db_0
+    username: root
+    password: root
+
+# 可选：开启 MyBatis 日志（查看 SQL）
+logging:
+  level:
+    com.wangchen.example.mapper: debug

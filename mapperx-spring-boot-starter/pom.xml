@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>com.wangchen</groupId>
+        <groupId>io.github.wangchen23</groupId>
         <artifactId>mapperx</artifactId>
         <version>1.0.0</version>
         <relativePath>../pom.xml</relativePath>
@@ -27,9 +27,8 @@
         </dependency>
 
         <dependency>
-            <groupId>com.wangchen</groupId>
+            <groupId>io.github.wangchen23</groupId>
             <artifactId>mapperx-core</artifactId>
-            <version>${project.version}</version>
         </dependency>
 
     </dependencies>

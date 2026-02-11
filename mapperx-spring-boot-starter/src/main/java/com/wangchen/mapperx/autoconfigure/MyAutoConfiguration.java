@@ -30,6 +30,7 @@ import java.util.Map;
 public class MyAutoConfiguration {
 
     @Bean
+    @ConditionalOnMissingBean
     public MapConfiguration myConfiguration() {
         return new MapConfiguration();
     }

@@ -57,7 +57,6 @@ public class MapConfiguration extends Configuration {
     @Override
     public <T> void addMapper(Class<T> type) {
         if (type.isInterface()) {
-            System.out.println(">>> MapConfiguration.addMapper: " + type.getName());
             super.addMapper(type);
             registerSuperInterfaces(type);
         }

@@ -8,6 +8,39 @@
     <version>1.0.0</version>
     <packaging>pom</packaging>
 
+    <licenses>
+        <license>
+            <name>Apache License, Version 2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+        </license>
+    </licenses>
+
+    <developers>
+        <developer>
+            <name>wangchen23</name>
+            <email>1374103097@qq.com</email>
+            <organizationUrl>https://github.com/wangchen23</organizationUrl>
+        </developer>
+    </developers>
+
+    <scm>
+        <connection>scm:git:https://github.com/wangchen23/mapperx.git</connection>
+        <developerConnection>scm:git:https://github.com/wangchen23/mapperx.git</developerConnection>
+        <url>https://github.com/wangchen23/mapperx</url>
+        <tag>v1.0.0</tag> <!-- 建议与当前版本一致 -->
+    </scm>
+
+    <distributionManagement>
+        <snapshotRepository>
+            <id>ossrh</id>
+            <url>https://s01.oss.sonatype.org/content/repositories/snapshots</url>
+        </snapshotRepository>
+        <repository>
+            <id>ossrh</id>
+            <url>https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+        </repository>
+    </distributionManagement>
+
     <modules>
         <module>mapperx-core</module>
         <module>mapperx-spring-boot-starter</module>

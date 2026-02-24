@@ -9,7 +9,6 @@ import org.apache.ibatis.reflection.MetaObject;
  * 提供完全自定义的自动填充能力
  *
  * @author chenwang
- * @date 2026/2/6 16:30
  **/
 public interface MetaObjectHandler {
 

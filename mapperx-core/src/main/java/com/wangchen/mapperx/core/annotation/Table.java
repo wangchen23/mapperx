@@ -9,7 +9,6 @@ import java.lang.annotation.Target;
  * 指定表名
  *
  * @author chenwang
- * @date 2025/6/19 08:43
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.TYPE)

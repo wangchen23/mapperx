@@ -11,7 +11,6 @@ import java.util.Properties;
  * MybatisConfig
  *
  * @author chenwang
- * @date 2026/2/11 14:00
  **/
 @Configuration
 public class MybatisConfig {

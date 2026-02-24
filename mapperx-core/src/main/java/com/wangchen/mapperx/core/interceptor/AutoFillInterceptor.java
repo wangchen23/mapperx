@@ -19,7 +19,6 @@ import java.util.List;
  * AutoFillInterceptor
  *
  * @author chenwang
- * @date 2026/2/6 15:34
  **/
 @Intercepts(@Signature(type = Executor.class, method = "update", args = {MappedStatement.class, Object.class}))
 public class AutoFillInterceptor implements Interceptor {

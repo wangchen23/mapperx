@@ -9,7 +9,6 @@ import java.lang.annotation.Target;
  * 字段映射
  *
  * @author chenwang
- * @date 2025/6/18 15:32
  */
 @Target({ElementType.FIELD})
 @Retention(RetentionPolicy.RUNTIME)

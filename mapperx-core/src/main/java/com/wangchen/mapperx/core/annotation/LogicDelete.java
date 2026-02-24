@@ -9,7 +9,6 @@ import java.lang.annotation.Target;
  * 标记逻辑删除字段
  *
  * @author chenwang
- * @date 2025/6/18 22:57
  */
 @Target({ElementType.FIELD})
 @Retention(RetentionPolicy.RUNTIME)

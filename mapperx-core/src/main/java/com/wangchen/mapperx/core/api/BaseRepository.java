@@ -19,7 +19,6 @@ import java.util.List;
  * - 逻辑删除 ≠ 物理删除，语义分离
  *
  * @author chenwang
- * @date 2025/6/18 16:49
  */
 public interface BaseRepository<T, K> {
 

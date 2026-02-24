@@ -17,7 +17,6 @@ import java.util.concurrent.ConcurrentHashMap;
  * MybatisUtils
  *
  * @author chenwang
- * @date 2026/1/15 16:44
  **/
 public class MybatisUtils {
 

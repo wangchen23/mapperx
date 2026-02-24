@@ -4,7 +4,6 @@ package com.wangchen.mapperx.core.annotation;
  * 主键生成策略
  *
  * @author chenwang
- * @date 2026/2/9 09:36
  **/
 public enum IdStrategy {
 

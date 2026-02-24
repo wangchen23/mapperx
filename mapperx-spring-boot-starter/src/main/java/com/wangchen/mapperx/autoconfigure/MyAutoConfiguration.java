@@ -24,7 +24,6 @@ import java.util.Map;
  * 自动注册插件
  *
  * @author chenwang
- * @date 2026/2/10 14:25
  **/
 @Configuration
 public class MyAutoConfiguration {

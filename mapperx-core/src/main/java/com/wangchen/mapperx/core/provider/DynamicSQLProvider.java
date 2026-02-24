@@ -13,7 +13,6 @@ import java.util.Map;
  * 核心功能：根据实体类注解自动生成单条/批量插入的纯文本 SQL，支持主键过滤、字段名映射
  *
  * @author chenwang
- * @date 2025/6/18 17:12
  **/
 public class DynamicSQLProvider {
 

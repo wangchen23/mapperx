@@ -15,7 +15,6 @@ import java.util.List;
  * UserController
  *
  * @author chenwang
- * @date 2026/2/10 17:10
  **/
 @RestController
 public class UserController {

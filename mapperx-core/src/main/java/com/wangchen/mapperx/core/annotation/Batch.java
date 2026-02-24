@@ -9,7 +9,6 @@ import java.lang.annotation.Target;
  * 批量操作 必须与 @MapMethod 配合使用。
  *
  * @author chenwang
- * @date 2025/6/18 17:27
  */
 @Target({ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)

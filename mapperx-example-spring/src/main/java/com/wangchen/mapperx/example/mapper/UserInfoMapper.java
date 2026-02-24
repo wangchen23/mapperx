@@ -8,7 +8,6 @@ import org.apache.ibatis.annotations.Mapper;
  * UserInfoMapper
  *
  * @author chenwang
- * @date 2026/1/15 21:05
  **/
 @Mapper
 public interface UserInfoMapper extends BaseMapperRepository<UserInfoDO, Long> {

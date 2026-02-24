@@ -31,7 +31,6 @@ import java.util.Properties;
  * Application
  *
  * @author chenwang
- * @date 2026/2/10 15:04
  **/
 public class Application {
 

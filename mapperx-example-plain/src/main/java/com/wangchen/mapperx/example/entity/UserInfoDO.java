@@ -12,7 +12,6 @@ import lombok.NoArgsConstructor;
  * UserInfoDO
  *
  * @author chenwang
- * @date 2026/1/16 19:43
  **/
 @Data
 @AllArgsConstructor

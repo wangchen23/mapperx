@@ -24,7 +24,6 @@ import java.util.concurrent.ConcurrentHashMap;
  * IdGeneratorInterceptor
  *
  * @author chenwang
- * @date 2026/2/9 15:09
  **/
 @Intercepts({@Signature(type = Executor.class, method = "update", args = {MappedStatement.class, Object.class})})
 public class IdGeneratorInterceptor implements Interceptor {

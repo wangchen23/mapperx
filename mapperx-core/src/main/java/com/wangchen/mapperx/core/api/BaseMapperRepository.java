@@ -15,7 +15,6 @@ import java.util.List;
  * 增强版通用 MyBatis Mapper 接口
  *
  * @author chenwang
- * @date 2025/6/18
  */
 public interface BaseMapperRepository<T, K> extends BaseRepository<T, K> {
     // ==================== 查询 ====================

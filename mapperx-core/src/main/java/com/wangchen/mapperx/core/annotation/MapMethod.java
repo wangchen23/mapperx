@@ -12,7 +12,6 @@ import java.lang.annotation.Target;
  * 若方法 标记了  @Select("SELECT * FROM user WHERE is_vip = 1 AND name LIKE #{name}")  那么当 selfFirst = true 时就会执行指定的sql
  *
  * @author chenwang
- * @date 2025/6/18 17:16
  */
 @Target({ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)

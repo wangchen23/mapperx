@@ -41,7 +41,6 @@ import java.util.concurrent.ConcurrentHashMap;
  * 2. 支持 @MapMethod 方法映射（别名代理）
  *
  * @author chenwang
- * @date 2025/6/19 12:39
  */
 public class MapConfiguration extends Configuration {
 

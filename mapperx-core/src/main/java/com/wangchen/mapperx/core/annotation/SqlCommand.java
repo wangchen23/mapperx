@@ -11,7 +11,6 @@ import java.lang.annotation.Target;
  * sql 类型
  *
  * @author chenwang
- * @date 2026/2/6 10:11
  **/
 @Target({ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)

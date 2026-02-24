@@ -9,7 +9,6 @@ import java.util.concurrent.ThreadLocalRandom;
  * OrderNoGenerator
  *
  * @author chenwang
- * @date 2026/2/9 14:34
  **/
 @Component
 public class OrderNoGenerator implements IdGenerator<Long> {

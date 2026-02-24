@@ -6,10 +6,9 @@
 
     <groupId>io.github.wangchen23</groupId>
     <artifactId>mapperx</artifactId>
-    <version>1.0.1</version>
+    <version>${revision}</version>
     <packaging>pom</packaging>
 
-    <!-- ========== 必须的项目元数据（会被 flatten 注入子模块） ========== -->
     <name>MapperX</name>
     <description>A MyBatis extension for dynamic mapping and auto-fill features</description>
     <url>https://github.com/wangchen23/mapperx</url>
@@ -38,26 +37,13 @@
         <tag>v${project.version}</tag>
     </scm>
 
-    <!-- ========== 发布仓库配置 ========== -->
-    <distributionManagement>
-        <snapshotRepository>
-            <id>ossrh</id>
-            <url>https://s01.oss.sonatype.org/content/repositories/snapshots</url>
-        </snapshotRepository>
-        <repository>
-            <id>ossrh</id>
-            <url>https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/</url>
-        </repository>
-    </distributionManagement>
-
-    <!-- ========== 模块 ========== -->
     <modules>
         <module>mapperx-core</module>
         <module>mapperx-spring-boot-starter</module>
     </modules>
 
-    <!-- ========== 属性 ========== -->
     <properties>
+        <revision>1.0.2</revision>
         <java.version>1.8</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
@@ -66,10 +52,8 @@
         <mybatis-spring-boot.version>2.1.4</mybatis-spring-boot.version>
     </properties>
 
-    <!-- ========== 依赖管理 ========== -->
     <dependencyManagement>
         <dependencies>
-            <!-- Spring Boot BOM -->
             <dependency>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-dependencies</artifactId>
@@ -77,22 +61,16 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
-
-            <!-- MyBatis 核心 -->
             <dependency>
                 <groupId>org.mybatis</groupId>
                 <artifactId>mybatis</artifactId>
                 <version>${mybatis.version}</version>
             </dependency>
-
-            <!-- MyBatis Spring Boot 集成 -->
             <dependency>
                 <groupId>org.mybatis.spring.boot</groupId>
                 <artifactId>mybatis-spring-boot-starter</artifactId>
                 <version>${mybatis-spring-boot.version}</version>
             </dependency>
-
-            <!-- 内部模块 -->
             <dependency>
                 <groupId>io.github.wangchen23</groupId>
                 <artifactId>mapperx-core</artifactId>
@@ -101,11 +79,9 @@
         </dependencies>
     </dependencyManagement>
 
-    <!-- ========== 构建配置 ========== -->
     <build>
-        <!-- ========== 实际执行的插件（关键：flatten 插件放这里） ========== -->
         <plugins>
-            <!-- Flatten Plugin: 确保子模块 POM 包含所有元数据和依赖版本 -->
+            <!-- Flatten 插件 -->
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>flatten-maven-plugin</artifactId>
@@ -131,31 +107,32 @@
                     </execution>
                 </executions>
             </plugin>
+
+            <!-- Central Publishing Plugin (仅在此处声明) -->
+            <plugin>
+                <groupId>org.sonatype.central</groupId>
+                <artifactId>central-publishing-maven-plugin</artifactId>
+                <version>0.9.0</version>
+                <extensions>true</extensions>
+                <configuration>
+                    <publishingServerId>central</publishingServerId>
+                    <autoPublish>true</autoPublish>
+                    <tokenAuth>true</tokenAuth>
+                </configuration>
+            </plugin>
+
+            <!-- 禁用传统 deploy -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-deploy-plugin</artifactId>
+                <configuration>
+                    <skip>true</skip>
+                </configuration>
+            </plugin>
         </plugins>
 
-        <!-- ========== 插件版本管理（子模块继承） ========== -->
         <pluginManagement>
             <plugins>
-                <!-- Central Publishing Plugin -->
-                <plugin>
-                    <groupId>org.sonatype.central</groupId>
-                    <artifactId>central-publishing-maven-plugin</artifactId>
-                    <version>0.8.0</version>
-                    <extensions>true</extensions>
-                    <configuration>
-                        <publishingServerId>central</publishingServerId>
-                        <autoPublish>true</autoPublish>
-                    </configuration>
-                </plugin>
-
-                <!-- Deploy Plugin -->
-                <plugin>
-                    <groupId>org.apache.maven.plugins</groupId>
-                    <artifactId>maven-deploy-plugin</artifactId>
-                    <version>3.1.3</version>
-                </plugin>
-
-                <!-- Source Plugin -->
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-source-plugin</artifactId>
@@ -170,7 +147,6 @@
                     </executions>
                 </plugin>
 
-                <!-- Javadoc Plugin -->
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-javadoc-plugin</artifactId>
@@ -191,7 +167,6 @@
                     </executions>
                 </plugin>
 
-                <!-- GPG Plugin -->
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-gpg-plugin</artifactId>
@@ -207,7 +182,6 @@
                     </executions>
                 </plugin>
 
-                <!-- Compiler Plugin -->
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-compiler-plugin</artifactId>

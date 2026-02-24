@@ -2,41 +2,30 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-    <modelVersion>4.0.0</modelVersion>
-
-    <!-- ========== 继承父 POM ========== -->
     <parent>
         <groupId>io.github.wangchen23</groupId>
         <artifactId>mapperx</artifactId>
-        <version>1.0.1</version>
+        <version>${revision}</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
-    <!-- ========== 子模块基本信息 ========== -->
+    <modelVersion>4.0.0</modelVersion>
     <artifactId>mapperx-core</artifactId>
-    <name>MapperX Core</name>
+    <packaging>jar</packaging>
 
-    <!-- ========== 依赖 ========== -->
+    <name>MapperX Core</name>
+    <description>Core module of MapperX, providing dynamic mapping and auto-fill features</description>
+
     <dependencies>
+        <!-- MyBatis核心依赖 -->
         <dependency>
             <groupId>org.mybatis</groupId>
             <artifactId>mybatis</artifactId>
-            <!-- 不需要写 version！flatten 会从 dependencyManagement 注入 -->
         </dependency>
     </dependencies>
 
-    <!-- ========== 构建插件 ========== -->
     <build>
         <plugins>
-            <!-- 只需声明插件，版本从父 POM pluginManagement 继承 -->
-            <plugin>
-                <groupId>org.sonatype.central</groupId>
-                <artifactId>central-publishing-maven-plugin</artifactId>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-deploy-plugin</artifactId>
-            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-source-plugin</artifactId>

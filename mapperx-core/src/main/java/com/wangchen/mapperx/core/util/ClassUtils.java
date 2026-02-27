@@ -25,6 +25,11 @@ public class ClassUtils {
     private static final Map<Class<?>, Map<String, Field>> FIELD_CACHE = new ConcurrentHashMap<>();
     private static final Map<Class<?>, Map<String, Method>> METHOD_CACHE = new ConcurrentHashMap<>();
 
+    private static final Map<String, Object> GENERAL_CACHE = new ConcurrentHashMap<>();
+    public static Map<String, Object> getCache() {
+        return GENERAL_CACHE;
+    }
+
     /**
      * 获取类中带有指定注解的所有字段（包含父类）
      */

@@ -1,6 +1,5 @@
 package com.wangchen.mapperx.core.config;
 
-
 import com.wangchen.mapperx.core.annotation.Batch;
 import com.wangchen.mapperx.core.annotation.IdStrategy;
 import com.wangchen.mapperx.core.annotation.MapMethod;
@@ -14,7 +13,6 @@ import com.wangchen.mapperx.core.util.SqlFieldUtils;
 import org.apache.ibatis.executor.keygen.Jdbc3KeyGenerator;
 import org.apache.ibatis.executor.keygen.KeyGenerator;
 import org.apache.ibatis.executor.keygen.NoKeyGenerator;
-import org.apache.ibatis.io.Resources;
 import org.apache.ibatis.mapping.MappedStatement;
 import org.apache.ibatis.mapping.ParameterMap;
 import org.apache.ibatis.mapping.ResultMap;
@@ -27,278 +25,289 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 自定义 MyBatis Configuration，实现三大核心能力：
- * 1. 自动注册 BaseMapperRepository 中的通用方法（泛型驱动）
- * 2. 支持 @MapMethod 方法映射（别名代理）
+ * 【优雅实现】MyBatis 泛型 Mapper 增强器（组合模式）
+ * 特性：
+ * 1. 用户自定义方法（XML/注解）优先，自动跳过冲突的 Base 方法
+ * 2. @MapMethod 仅注册别名，无冗余 SQL
+ * 3. 不继承 Configuration，兼容未来版本
  *
  * @author chenwang
  */
-public class MapConfiguration extends Configuration {
+public class MapConfiguration {
 
-    /** 缓存方法上的 @MapMethod 的 targetId 注解解析结果 */
-    private final Map<String, String> annotationResults = new ConcurrentHashMap<>();
-    // 新增缓存：MS ID → 对应的ResultMap（解决@MapMethod返回值不一致）
-    private final Map<String, ResultMap> methodResultMapCache = new ConcurrentHashMap<>();
+    private final Configuration configuration;
 
-    /**
-     * 【入口】当 MyBatis 添加 Mapper 接口时触发
-     * 除了调用父类逻辑，还会尝试注册其继承的 BaseMapperRepository 泛型方法
-     */
-    @Override
-    public <T> void addMapper(Class<T> type) {
-        if (type.isInterface()) {
-            super.addMapper(type);
-            registerSuperInterfaces(type);
-        }
+    public MapConfiguration(Configuration configuration) {
+        this.configuration = Objects.requireNonNull(configuration, "Configuration cannot be null");
     }
 
     /**
-     * 【核心】自动注册 BaseMapperRepository 的泛型方法为 MappedStatement
-     * 前提：当前接口直接继承 BaseMapperRepository< T, K, Q>
+     * 【推荐入口】在所有 Mapper 注册完成后调用（如 Spring 的 ApplicationRunner）
      */
-    private void registerSuperInterfaces(Class<?> mapperInterface) {
-        Class<?>[] parents = mapperInterface.getInterfaces();
-        // 只处理直接继承 BaseMapperRepository 的接口
-        if (parents.length == 0 || !BaseMapperRepository.class.isAssignableFrom(parents[0])) {
+    public void enhance() {
+        // 获取所有已注册的 Mapper 接口
+        Collection<Class<?>> mappers = configuration.getMapperRegistry().getMappers();
+        for (Class<?> mapper : mappers) {
+            if (isBaseMapper(mapper)) {
+                registerBaseMethods(mapper);
+            }
+        }
+    }
+
+    private boolean isBaseMapper(Class<?> mapperInterface) {
+        return Arrays.stream(mapperInterface.getInterfaces())
+                .anyMatch(BaseMapperRepository.class::isAssignableFrom);
+    }
+
+    private void registerBaseMethods(Class<?> mapperInterface) {
+        // 查找继承的 BaseMapperRepository 接口及泛型参数
+        Class<?> baseParent = null;
+        Type genericType = null;
+        Class<?>[] interfaces = mapperInterface.getInterfaces();
+        for (int i = 0; i < interfaces.length; i++) {
+            if (BaseMapperRepository.class.isAssignableFrom(interfaces[i])) {
+                baseParent = interfaces[i];
+                genericType = mapperInterface.getGenericInterfaces()[i];
+                break;
+            }
+        }
+        if (baseParent == null || !(genericType instanceof ParameterizedType)) {
             return;
         }
 
-        // 【关键】解析泛型实参
-        Type genericSuper = mapperInterface.getGenericInterfaces()[0];
-        Type[] args = ((ParameterizedType) genericSuper).getActualTypeArguments();
+        // 修复：严谨校验泛型参数类型
+        ParameterizedType parameterizedType = (ParameterizedType) genericType;
+        Type[] actualTypeArguments = parameterizedType.getActualTypeArguments();
+        if (actualTypeArguments.length == 0 || !(actualTypeArguments[0] instanceof Class)) {
+            throw new IllegalStateException("BaseMapperRepository generic parameter must be a Class type for mapper: " + mapperInterface.getName());
+        }
+        Class<?> entityClass = (Class<?>) actualTypeArguments[0];
 
-        Class<?> entityClass = (Class<?>) args[0];
         validatePrimaryKeyAnnotation(entityClass);
-        Method[] baseMethods = parents[0].getMethods();
+
         String mapperName = mapperInterface.getName();
-        // 第一轮：注册非 MapMethod 方法
-        for (Method method : baseMethods) {
-            if (method.getAnnotation(MapMethod.class) != null) {
-                continue;
-            }
-            registerMethod(mapperName, method, entityClass);
-        }
+        Method[] methods = baseParent.getMethods();
 
-        // 第二轮：注册 @MapMethod 方法（此时目标方法已存在）
-        for (Method method : baseMethods) {
+        // 先注册普通方法（非 @MapMethod）
+        for (Method method : methods) {
             if (method.getAnnotation(MapMethod.class) == null) {
-                continue;
+                registerNormalMethod(mapperName, method, entityClass);
             }
-            registerMethod(mapperName, method, entityClass);
+        }
+
+        // 再注册 @MapMethod 别名（此时目标方法一定存在）
+        for (Method method : methods) {
+            MapMethod anno = method.getAnnotation(MapMethod.class);
+            if (anno != null && !anno.value().isEmpty()) {
+                registerMapMethodAlias(mapperName, method, anno, entityClass);
+            }
         }
     }
 
-    private void validatePrimaryKeyAnnotation(Class<?> entityClass) {
-        List<Field> fields = ClassUtils.getFieldsByAnnotation(entityClass, PrimaryKey.class);
-        if (fields.isEmpty()) {
-            throw new IllegalStateException("Entity [" + entityClass.getSimpleName() + "] must have at least one field annotated with @PrimaryKey.");
-        }
-    }
-
-    private void registerMethod(String mapperName, Method method, Class<?> entityClass) {
+    // ==================== 普通方法注册 ====================
+    private void registerNormalMethod(String mapperName, Method method, Class<?> entityClass) {
         String msId = mapperName + "." + method.getName();
-        checkMethod(mapperName, method);
-        if (mappedStatements.containsKey(msId)) {
-            return;
+        if (configuration.hasStatement(msId, false)) {
+            return; // 用户已定义，跳过
         }
-        DynamicSqlSource sqlSource = buildSqlSource(method);
+
+        validateBatchAnnotation(method);
+
         SqlCommand sqlCommand = method.getAnnotation(SqlCommand.class);
-        // 通过 MapMethod 映射的会为空，但是在后面的 addMappedStatement 中会被替换掉，所以不影响
         SqlCommandType cmd = Optional.ofNullable(sqlCommand).map(SqlCommand::value).orElse(null);
-        Class<?> param = method.getParameterCount() > 0 ? method.getParameterTypes()[0] : Object.class;
-        ParameterMap paramMap = new ParameterMap.Builder(this, msId + "-Inline", param, Collections.emptyList()).build();
 
-        // 构建并注册 ResultMap（id = msId）
-        ResultMap rm = buildResultMap(msId, method, entityClass);
-        super.addResultMap(rm);
-        methodResultMapCache.put(msId, rm);
+        DynamicSqlSource sqlSource = buildSqlSource(method);
+        Class<?> paramType = method.getParameterCount() > 0 ? method.getParameterTypes()[0] : Object.class;
+        ParameterMap paramMap = new ParameterMap.Builder(configuration, msId + "-Inline", paramType, Collections.emptyList()).build();
 
-        // ========== 自动配置 AUTO 主键回写 ==========
+        ResultMap resultMap = buildResultMap(msId, method, entityClass);
+        // 修复：先检查 ResultMap 是否已存在，避免重复注册
+        if (!configuration.hasResultMap(resultMap.getId())) {
+            configuration.addResultMap(resultMap);
+        }
+
         KeyGenerator keyGenerator = NoKeyGenerator.INSTANCE;
         String autoKeyProp = null;
         if (cmd == SqlCommandType.INSERT) {
             autoKeyProp = getAutoKeyProperty(entityClass);
             if (autoKeyProp != null) {
-                //keyGenerator = new AutoGeneratedKeyGenerator(autoKeyProp);
                 keyGenerator = Jdbc3KeyGenerator.INSTANCE;
             }
         }
 
-        MappedStatement.Builder msBuilder = new MappedStatement.Builder(this, msId, sqlSource, cmd).parameterMap(paramMap).resultMaps(Collections.singletonList(rm)).keyGenerator(keyGenerator);
+        MappedStatement ms = new MappedStatement.Builder(configuration, msId, sqlSource, cmd)
+                .parameterMap(paramMap)
+                .resultMaps(Collections.singletonList(resultMap))
+                .keyGenerator(keyGenerator)
+                .keyProperty(autoKeyProp)
+                .build();
 
-        if (autoKeyProp != null) {
-            msBuilder.keyProperty(autoKeyProp);
-        }
-
-        MappedStatement ms = msBuilder.build();
         sqlSource.setMappedStatement(ms);
-        this.addMappedStatement(ms);
+        configuration.addMappedStatement(ms);
     }
 
-    private void checkMethod(String mapperName, Method method) {
-        boolean isBatch = method.isAnnotationPresent(Batch.class);
-        MapMethod mapMethodAnno = method.getAnnotation(MapMethod.class);
-
-        // 规则1: 有 @Batch ⇒ 必须有有效 @MapMethod
-        if (isBatch) {
-            if (mapMethodAnno == null || mapMethodAnno.value().isEmpty()) {
-                throw new IllegalStateException("Method [" + method.getName() + "] in [" + mapperName + "] has @Batch but missing or empty @MapMethod annotation.");
-            }
+    // ==================== @MapMethod 别名注册 ====================
+    private void registerMapMethodAlias(String mapperName, Method method, MapMethod mapMethodAnno, Class<?> entityClass) {
+        String msId = mapperName + "." + method.getName();
+        if (configuration.hasStatement(msId, false)) {
+            return;
         }
 
-        // 规则2: 有 @MapMethod ⇒ 对应的 MappedStatement 必须已注册
-        if (mapMethodAnno != null && !mapMethodAnno.value().isEmpty()) {
-            String targetMethodName = mapMethodAnno.value();
-            String targetMsId = mapperName + "." + targetMethodName;
+        validateBatchAnnotation(method);
 
-            if (!mappedStatements.containsKey(targetMsId)) {
-                throw new IllegalStateException("Method [" + method.getName() + "] in [" + mapperName + "] references non-existent MappedStatement via @MapMethod: '" + targetMsId + "'. " + "Ensure the target method is registered before this one.");
+        String targetMsId = mapperName + "." + mapMethodAnno.value();
+        if (!configuration.hasStatement(targetMsId, false)) {
+            throw new IllegalStateException("Target method not found for @MapMethod: " + targetMsId);
+        }
+
+        ResultMap resultMap = buildResultMap(msId, method, entityClass);
+        // 修复：先检查 ResultMap 是否已存在，避免重复注册
+        if (!configuration.hasResultMap(resultMap.getId())) {
+            configuration.addResultMap(resultMap);
+        }
+
+        MappedStatement targetMs = configuration.getMappedStatement(targetMsId, false);
+        MappedStatement aliasMs = copyMappedStatement(targetMs, msId, targetMs.getSqlSource(), Collections.singletonList(resultMap));
+
+        configuration.addMappedStatement(aliasMs);
+    }
+
+    // ==================== 工具方法 ====================
+    private void validatePrimaryKeyAnnotation(Class<?> entityClass) {
+        List<Field> fields = ClassUtils.getFieldsByAnnotation(entityClass, PrimaryKey.class);
+        if (fields.isEmpty()) {
+            throw new IllegalStateException("Entity [" + entityClass.getSimpleName() + "] must have exactly one @PrimaryKey field");
+        }
+        // 修复：校验主键字段唯一性
+        if (fields.size() > 1) {
+            throw new IllegalStateException("Entity [" + entityClass.getSimpleName() + "] cannot have more than one @PrimaryKey field");
+        }
+    }
+
+    private void validateBatchAnnotation(Method method) {
+        // 修复：@Batch 注解校验逻辑，仅当存在 @Batch 时检查 @MapMethod 是否非空
+        if (method.isAnnotationPresent(Batch.class)) {
+            MapMethod mm = method.getAnnotation(MapMethod.class);
+            if (mm == null || mm.value().isEmpty()) {
+                throw new IllegalStateException("Method [" + method.getName() + "] with @Batch must have non-empty @MapMethod");
             }
         }
     }
 
-    /**
-     * 【动态 SQL】根据方法名匹配对应的 SQL 生成策略（Provider 方法）
-     * 当前仅支持 insert，可按需扩展
-     */
     private DynamicSqlSource buildSqlSource(Method method) {
-        String providerMethod = method.getName();
-        // 从 DynamicSQLProvider 中查找匹配的方法; 若通过 MapMethod 映射的会为空，但是在后面的 addMappedStatement 中会被替换掉，所以不影响
-        Method pm = Arrays.stream(DynamicSQLProvider.class.getMethods()).filter(m -> m.getName().equals(providerMethod)).findFirst().orElse(null);
+        String methodName = method.getName();
+        Method providerMethod = Arrays.stream(DynamicSQLProvider.class.getMethods())
+                .filter(m -> m.getName().equals(methodName))
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("No SQL provider for method: " + methodName));
 
         try {
-            Object provider = DynamicSQLProvider.class.getDeclaredConstructor().newInstance();
-            return new DynamicSqlSource(provider, pm);
+            DynamicSQLProvider provider = DynamicSQLProvider.class.getDeclaredConstructor().newInstance();
+            return new DynamicSqlSource(provider, providerMethod);
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            throw new RuntimeException("Failed to create SQL source for method: " + methodName, e);
         }
     }
 
-
-    /**
-     * 构建 ResultMap：支持实体、List<实体>
-     */
     private ResultMap buildResultMap(String msId, Method method, Class<?> entity) {
         Class<?> returnType = method.getReturnType();
-        boolean isSimpleType = returnType.isPrimitive();
-        Class<?> resultType = isSimpleType ? returnType : entity;
+        // 使用 MyBatis 内置工具判断简单类型，替代自定义 SqlFieldUtils
+        boolean isSimple = isMyBatisSimpleType(returnType);
+        Class<?> resultType = isSimple ? returnType : entity;
+
         List<ResultMapping> mappings = new ArrayList<>();
-        if (isSimpleType) {
-            return new ResultMap.Builder(this, msId, resultType, mappings).build();
+        if (!isSimple) {
+            for (Map.Entry<String, Field> entry : ClassUtils.getFieldMap(entity).entrySet()) {
+                Field field = entry.getValue();
+                String column = SqlFieldUtils.getColumnName(field);
+                mappings.add(new ResultMapping.Builder(configuration, field.getName(), column, field.getType()).build());
+            }
         }
-        for (Map.Entry<String, Field> entry : ClassUtils.getFieldMap(entity).entrySet()) {
-            Field field = entry.getValue();
-            String columnName = SqlFieldUtils.getColumnName(field);
-            ResultMapping mapping = new ResultMapping.Builder(this, field.getName(), columnName, field.getType()).build();
-            mappings.add(mapping);
-        }
-        return new ResultMap.Builder(this, msId, resultType, mappings).build();
+        // ResultMap ID 增加唯一性标识，避免冲突
+        String resultMapId = msId + "-ResultMap";
+        return new ResultMap.Builder(configuration, resultMapId, resultType, mappings).build();
     }
 
     /**
-     * 获取实体类中 @PrimaryKey(strategy = IdStrategy.AUTO) 的字段名
-     * 前提：每个实体最多一个主键（你已保证）
+     * 适配 MyBatis 的简单类型判断（推荐版本）
+     * 1. 优先用 isPrimitive() 判断基本类型（遵循官方语义）
+     * 2. 补充 MyBatis 核心简单类型（包装类、String、常用日期/数值）
+     * 3. 可根据业务灵活增删，无版本/反射依赖
      */
-    private String getAutoKeyProperty(Class<?> entityClass) {
-        List<Field> primaryKeyFields = ClassUtils.getFieldsByAnnotation(entityClass, PrimaryKey.class);
-        if (primaryKeyFields.isEmpty()) {
-            return null;
+    private boolean isMyBatisSimpleType(Class<?> clazz) {
+        if (clazz == null) {
+            return false;
         }
 
-        // 按约定取第一个（你已确保唯一性）
-        Field field = primaryKeyFields.get(0);
-        PrimaryKey pk = field.getAnnotation(PrimaryKey.class);
-        if (pk.strategy() == IdStrategy.AUTO) {
-            return field.getName();
+        // 1. 基本类型（严格遵循 isPrimitive() 官方规则：8个基本类型+void）
+        if (clazz.isPrimitive()) {
+            return true;
+        }
+
+        // 2. 核心包装类型（对应8个基本类型，必加）
+        if (clazz.equals(Boolean.class) || clazz.equals(Byte.class)
+                || clazz.equals(Character.class) || clazz.equals(Short.class)
+                || clazz.equals(Integer.class) || clazz.equals(Long.class)
+                || clazz.equals(Float.class) || clazz.equals(Double.class)) {
+            return true;
+        }
+
+        // 3. 常用简单类型（根据业务场景增删，以下是通用必选）
+        return clazz.equals(String.class)
+                || clazz.equals(Date.class)
+                || clazz.equals(java.sql.Date.class)
+                || clazz.equals(BigDecimal.class)
+                || clazz.isEnum();
+    }
+
+    private String getAutoKeyProperty(Class<?> entityClass) {
+        List<Field> fields = ClassUtils.getFieldsByAnnotation(entityClass, PrimaryKey.class);
+        if (!fields.isEmpty()) {
+            Field field = fields.get(0);
+            PrimaryKey primaryKey = field.getAnnotation(PrimaryKey.class);
+            // 修复：增加空指针防护
+            if (primaryKey != null && primaryKey.strategy() == IdStrategy.AUTO) {
+                return field.getName();
+            }
         }
         return null;
     }
 
-    // ====== 以下为 @MapMethod 字段映射支持 ======
+    private MappedStatement copyMappedStatement(MappedStatement source, String newId, SqlSource sqlSource, List<ResultMap> resultMaps) {
+        MappedStatement.Builder builder = new MappedStatement.Builder(configuration, newId, sqlSource, source.getSqlCommandType())
+                .resource(source.getResource())
+                .fetchSize(source.getFetchSize())
+                .statementType(source.getStatementType())
+                .resultSetType(source.getResultSetType())
+                .timeout(source.getTimeout())
+                .parameterMap(source.getParameterMap())
+                .resultMaps(resultMaps)
+                .cache(source.getCache())
+                .flushCacheRequired(source.isFlushCacheRequired())
+                .useCache(source.isUseCache())
+                .keyGenerator(source.getKeyGenerator())
+                .databaseId(source.getDatabaseId())
+                .lang(source.getLang());
 
-    /**
-     * 【拦截点】所有 MappedStatement 注册都会经过此方法
-     * 在此处处理 @MapMethod（方法别名）
-     */
-    @Override
-    public void addMappedStatement(MappedStatement ms) {
-        String id = ms.getId();
-        if (mappedStatements.containsKey(id)) {
-            return;
-        }
-
-        // 解析方法上的注解
-        String targetId = annotationResults.computeIfAbsent(id, this::parseAnnotations);
-        MappedStatement finalMs = ms;
-
-        // 【@MapMethod】将当前方法映射到另一个已存在的 MappedStatement
-        if (targetId != null) {
-            MappedStatement target = getMappedStatement(targetId, false);
-            ResultMap resultMap = methodResultMapCache.get(id);
-            if (target != null) {
-                finalMs = copyMappedStatement(target, id, target.getSqlSource(), Collections.singletonList(resultMap));
-            }
-        }
-        super.addMappedStatement(finalMs);
-    }
-
-    /**
-     * 解析方法上的 @MapMethod 注解
-     */
-    private String parseAnnotations(String id) {
-        String r = null;
-        try {
-            int dot = id.lastIndexOf('.');
-            String className = id.substring(0, dot);
-            String methodName = id.substring(dot + 1);
-            Class<?> clazz = Resources.classForName(className);
-            Method method = ClassUtils.getPublicMethod(clazz, methodName);
-            if (method == null) {
-                return r;
-            }
-
-            MapMethod mm = method.getAnnotation(MapMethod.class);
-
-            if (mm != null && !mm.value().isEmpty()) {
-                r = clazz.getName() + "." + mm.value();
-            }
-        } catch (Exception e) {
-            throw new RuntimeException("Parse annotation failed: " + id, e);
-        }
-        return r;
-    }
-
-    /**
-     * 复制一个 MappedStatement，仅修改 ID 和 SqlSource
-     */
-    private MappedStatement copyMappedStatement(MappedStatement source, String newId, SqlSource sqlSource, List<ResultMap> newResultMaps) {
-        MappedStatement.Builder b = new MappedStatement.Builder(source.getConfiguration(), newId, sqlSource, source.getSqlCommandType());
-        b.resource(source.getResource()).fetchSize(source.getFetchSize()).statementType(source.getStatementType()).resultSetType(source.getResultSetType()).timeout(source.getTimeout()).parameterMap(source.getParameterMap()).resultMaps(newResultMaps).cache(source.getCache()).flushCacheRequired(source.isFlushCacheRequired()).useCache(source.isUseCache()).keyGenerator(source.getKeyGenerator());
-
+        // 修复：规范设置 keyProperty，避免空字符串
         if (source.getKeyProperties() != null && source.getKeyProperties().length > 0) {
-            b.keyProperty(String.join(",", source.getKeyProperties()));
+            String keyProperty = String.join(",", source.getKeyProperties());
+            if (!keyProperty.isEmpty()) {
+                builder.keyProperty(keyProperty);
+            }
         }
-        b.databaseId(source.getDatabaseId()).lang(source.getLang());
-        return b.build();
+        return builder.build();
     }
-
-    /**
-     * 安全添加 KeyGenerator，避免 XML 与注解冲突
-     */
-    @Override
-    public void addKeyGenerator(String id, KeyGenerator kg) {
-        if (!keyGenerators.containsKey(id)) {
-            keyGenerators.put(id, kg);
-        }
-    }
-
 }

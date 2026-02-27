@@ -1,9 +1,6 @@
 package com.wangchen.mapperx.example;
 
-import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInterceptor;
-import com.wangchen.mapperx.core.conditions.ConditionWrapper;
-import com.wangchen.mapperx.core.conditions.UpdateSpec;
 import com.wangchen.mapperx.core.config.MapConfiguration;
 import com.wangchen.mapperx.core.interceptor.AutoFillInterceptor;
 import com.wangchen.mapperx.core.interceptor.BatchSplitInterceptor;
@@ -23,17 +20,15 @@ import org.apache.ibatis.transaction.jdbc.JdbcTransactionFactory;
 
 import javax.sql.DataSource;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
 
 /**
- * Application
+ * Application（适配组合模式的 MapConfiguration）
  *
  * @author chenwang
  **/
 public class Application {
-
 
     public static void main(String[] args) {
         System.setProperty("org.slf4j.simpleLogger.log.com.wangchen.mapperx", "DEBUG");
@@ -46,56 +41,37 @@ public class Application {
         try (SqlSession session = sqlSessionFactory.openSession(false)) {
             UserInfoMapper userMapper = session.getMapper(UserInfoMapper.class);
 
-
             List<UserInfoDO> list = new ArrayList<>();
-            list.add(new UserInfoDO(52L, "张三", null,1));
-            list.add(new UserInfoDO(53L, "李", 13,1));
-            list.add(new UserInfoDO(54L, "王五", null,1));
+            list.add(new UserInfoDO(null, "张三", null,1));
+            list.add(new UserInfoDO(null, "李", 13,1));
+            list.add(new UserInfoDO(null, "王五", null,1));
 
             UserInfoDO userInfoDO = new UserInfoDO();
-            //userInfoDO.setUserName("nnn");
+            userInfoDO.setId(53L);
             userInfoDO.setAge(90);
+            //list.add(userInfoDO1);
+            //UserInfoDO userInfoDO2 = new UserInfoDO();
+            //userInfoDO2.setId(null);
+            //userInfoDO2.setAge(90);
+            //list.add(userInfoDO2);
+            //UserInfoDO userInfoDO3 = new UserInfoDO();
+            //userInfoDO3.setId(null);
+            //userInfoDO3.setAge(90);
+            //list.add(userInfoDO3);
+            
 
-            //userMapper.batchInsert(list);
-            //userMapper.batchUpdate(list);
-            //userMapper.batchUpdateSelective(list);
-            ConditionWrapper<UserInfoDO> wrapper = new ConditionWrapper<>();
-            wrapper.in(UserInfoDO::getId, Arrays.asList(58L, 509L, 60L));
-            //int update =   userMapper.updateByConditionSelective(userInfoDO, wrapper);
-            //int update = userMapper.updateByCondition(userInfoDO, wrapper);
-            UpdateSpec<UserInfoDO> updateSpec = new UpdateSpec<>();
-            updateSpec.set(UserInfoDO::getUserName, null);
-            //int update = userMapper.updateByConditionWithFields(updateSpec, wrapper);
-            //userMapper.deleteByCondition(wrapper);
-            //userMapper.logicDeleteByCondition(wrapper);
-            //userMapper.insert(userInfoDO);
             int i = userMapper.insertSelective(userInfoDO);
-            //userMapper.updateSelective(userInfoDO);
-            //int update = userMapper.updateSelective(userInfoDO);
+            //int i = userMapper.batchInsertSelective(list);
+            //int i = userMapper.batchUpdate(list);
 
-            //UserInfoDO infoDO = userMapper.getById(60L);
-
-            //boolean  b = userMapper.existsById(50L);
-            //boolean b1 = userMapper.existsByCondition(wrapper);
-            //UserInfoDO userInfoDO1 = userMapper.selectOne(wrapper);
-            //List<UserInfoDO> list1 = userMapper.list(wrapper);
-            //long count = userMapper.count(wrapper);
-            //UserInfoDO userInfoDO1 = userMapper.lockById(60L);
-            //QueryWrapper<UserInfoDO> wrapper1 = new QueryWrapper<>();
-            //PageResult<UserInfoDO> result = userMapper.pageQuery(wrapper1);
-            PageHelper.startPage(2, 1);
-            //List<UserInfoDO> list1 = userMapper.list(null);
-            //PageInfo<UserInfoDO> pageInfo = new PageInfo<>(list1);
-            System.out.println("插入成功");
-
-            // 分页（前提是 PageQueryInterceptor 已注册）
-            // PageResult<UserDO> page = userMapper.page(param);
             session.commit();
+            //list.forEach(u -> System.out.println(u.getId()));
+            System.out.println(userInfoDO.getId());
         }
     }
 
     public static SqlSessionFactory createSqlSessionFactory() {
-        // 1. 创建数据源（以 HikariCP 为例）
+        // 1. 数据源
         HikariConfig config = new HikariConfig();
         config.setJdbcUrl("jdbc:mysql://localhost:3306/sharding_db_0");
         config.setUsername("root");
@@ -103,36 +79,39 @@ public class Application {
         config.setDriverClassName("com.mysql.cj.jdbc.Driver");
         DataSource dataSource = new HikariDataSource(config);
 
-        // 2. 创建 MyBatis Environment
-        JdbcTransactionFactory transactionFactory = new JdbcTransactionFactory();
-        Environment environment = new Environment("dev", transactionFactory, dataSource);
+        // 2. MyBatis 环境
+        Environment environment = new Environment("dev", new JdbcTransactionFactory(), dataSource);
 
-        // 3. 创建 Configuration
-        Configuration configuration = new MapConfiguration();
-        configuration.setEnvironment(environment);
-        // 可选：开启驼峰映射
-        configuration.setMapUnderscoreToCamelCase(true);
+        // 3. 创建原生 Configuration
+        Configuration nativeConfig = new Configuration();
+        nativeConfig.setEnvironment(environment);
+        nativeConfig.setMapUnderscoreToCamelCase(true);
 
-        // 4. 【关键】注册你的具体 Mapper 接口
-        configuration.addMapper(UserInfoMapper.class);
-        // 如果有多个，继续 addMapper(...)
+        // 4. 【关键】先注册 Mapper 到 MyBatis 原生 Configuration
+        nativeConfig.addMapper(UserInfoMapper.class);
+        // 如果有其他 Mapper，继续加：
+        // nativeConfig.addMapper(OrderMapper.class);
 
-        // 5. 【可选】注册自定义插件（如分页、批量等）
-        // 分页插件
-        configuration.addInterceptor(new PageInterceptor());
-        // 自动填充插件
-        configuration.addInterceptor(new AutoFillInterceptor(new BusinessLogicDrivenHandler()));
-        // 自动分批次插件
-        BatchSplitInterceptor interceptor = new BatchSplitInterceptor();
-        Properties props = new Properties();
-        props.setProperty("maxBatchSize", "2");
-        interceptor.setProperties(props);
-        configuration.addInterceptor(interceptor);
-        // id 生成器
-        IdGeneratorInterceptor idGeneratorInterceptor = new IdGeneratorInterceptor();
-        idGeneratorInterceptor.registerGenerator("order", new OrderNoGenerator());
-        configuration.addInterceptor(idGeneratorInterceptor);
-        // 6. 构建 SqlSessionFactory
-        return new SqlSessionFactoryBuilder().build(configuration);
+        // 5. 【关键】创建 MapConfiguration 并增强
+        MapConfiguration mapConfig = new MapConfiguration(nativeConfig);
+        mapConfig.enhance(); // 👈 这一步会为 UserInfoMapper 注入 Base 方法
+
+        // 6. 注册插件（必须在 enhance 之后？其实顺序无关，但建议在 enhance 前或后均可）
+        nativeConfig.addInterceptor(new PageInterceptor());
+        nativeConfig.addInterceptor(new AutoFillInterceptor(new BusinessLogicDrivenHandler()));
+
+        BatchSplitInterceptor batchInterceptor = new BatchSplitInterceptor();
+        //batchInterceptor.setProperties(new Properties() {
+        //    {setProperty("splitThreshold", "2");}
+        //    {setProperty("batchChunkSize", "1");}
+        //});
+        nativeConfig.addInterceptor(batchInterceptor);
+
+        IdGeneratorInterceptor idGenInterceptor = new IdGeneratorInterceptor();
+        idGenInterceptor.registerGenerator("order", new OrderNoGenerator());
+        nativeConfig.addInterceptor(idGenInterceptor);
+
+        // 7. 构建工厂
+        return new SqlSessionFactoryBuilder().build(nativeConfig);
     }
 }

@@ -1,8 +1,10 @@
 package com.wangchen.mapperx.core.interceptor;
 
 import com.wangchen.mapperx.core.annotation.Batch;
+import com.wangchen.mapperx.core.annotation.MapMethod;
 import com.wangchen.mapperx.core.util.ClassUtils;
 import com.wangchen.mapperx.core.util.MybatisUtils;
+import org.apache.ibatis.exceptions.PersistenceException;
 import org.apache.ibatis.executor.Executor;
 import org.apache.ibatis.mapping.MappedStatement;
 import org.apache.ibatis.plugin.Interceptor;
@@ -10,18 +12,20 @@ import org.apache.ibatis.plugin.Intercepts;
 import org.apache.ibatis.plugin.Invocation;
 import org.apache.ibatis.plugin.Plugin;
 import org.apache.ibatis.plugin.Signature;
+import org.apache.ibatis.session.Configuration;
+import org.apache.ibatis.session.ExecutorType;
+import org.apache.ibatis.transaction.Transaction;
 
 import java.lang.reflect.Method;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * MyBatis 批量操作智能拦截器
- * - 小批量（≤ threshold）：直接执行原生 <foreach> 方法（高性能）
- * - 大批量（> threshold）：自动拆分为单条执行（防 OOM / SQL 过长）
+ * MyBatis 批量操作智能拦截器（线程安全、无日志依赖版）
+ * - 小批量（≤ threshold）：走原生 <foreach> 批量（高性能）
+ * - 大批量（> threshold）：创建独立 BatchExecutor 单条循环执行（防 OOM / SQL 过长）
  *
  * @author chenwang
  */
@@ -29,13 +33,17 @@ import java.util.concurrent.ConcurrentHashMap;
 public class BatchSplitInterceptor implements Interceptor {
 
     private static final Map<String, Boolean> IS_BATCH_METHOD = new ConcurrentHashMap<>();
-    private int batchSize = 500;
+    private static final Map<String, String> BATCH_TO_SINGLE_MS_ID = new ConcurrentHashMap<>();
+
+    private int splitThreshold = 1000;
+    private int batchChunkSize = 300;
 
     @Override
     public Object intercept(Invocation invocation) throws Throwable {
         MappedStatement ms = (MappedStatement) invocation.getArgs()[0];
         Object param = invocation.getArgs()[1];
 
+        // 非 @Batch 方法直接放行
         if (!IS_BATCH_METHOD.computeIfAbsent(ms.getId(), this::isBatchMethod)) {
             return invocation.proceed();
         }
@@ -45,26 +53,64 @@ public class BatchSplitInterceptor implements Interceptor {
             return 0;
         }
 
-        // 小批量：走原生 <foreach>（高性能）
-        if (list.size() <= batchSize) {
+        // 小批量：走原生 <foreach>（由 MyBatis XML 处理）
+        if (list.size() <= splitThreshold) {
             return invocation.proceed();
         }
 
-        // 大批量：分片执行（每片 ≤ batchSize）
-        Executor executor = (Executor) invocation.getTarget();
+        // === 大批量：创建独立 BatchExecutor 执行 ===
+        Executor originalExecutor = (Executor) invocation.getTarget();
+        Configuration configuration = ms.getConfiguration();
+        Transaction transaction = originalExecutor.getTransaction();
+
+        // 获取对应的单条操作 MappedStatement
+        String singleMsId = BATCH_TO_SINGLE_MS_ID.computeIfAbsent(ms.getId(), this::deriveSingleMsId);
+        MappedStatement singleMs = configuration.getMappedStatement(singleMsId, false);
+
+        // 创建独立的 BatchExecutor（复用当前事务，线程安全）
+        Executor batchExecutor = configuration.newExecutor(transaction, ExecutorType.BATCH);
+
         int total = 0;
-
-        for (int i = 0; i < list.size(); i += batchSize) {
-            int end = Math.min(i + batchSize, list.size());
-            List<?> subList = list.subList(i, end);
-            Object subParam = rebuildParameter(param, subList);
-            total += executor.update(ms, subParam);
+        int count = 0;
+        try {
+            for (Object item : list) {
+                batchExecutor.update(singleMs, item);
+                total++;
+                count++;
+                if (count >= batchChunkSize) {
+                    batchExecutor.flushStatements();
+                    count = 0;
+                }
+            }
+            // 执行所有 pending 的 batch 语句（但不提交）
+            batchExecutor.flushStatements();
+            return total;
+        } catch (Exception e) {
+            throw new PersistenceException("Batch method [" + ms.getId() + "] failed after processing " + total + " items", e);
         }
-
-        return total;
     }
 
-    // 判断方法是否标注了 @Batch
+    /**
+     * 根据 @MapMethod 注解获取单条方法 ID（强约定：有 @Batch 必有 @MapMethod）
+     */
+    private String deriveSingleMsId(String batchMsId) {
+        int lastDot = batchMsId.lastIndexOf('.');
+        String className = batchMsId.substring(0, lastDot);
+        String methodName = batchMsId.substring(lastDot + 1);
+
+        try {
+            Class<?> mapperClass = Class.forName(className);
+            Method batchMethod = ClassUtils.getPublicMethod(mapperClass, methodName);
+            MapMethod mapMethodAnn = batchMethod.getAnnotation(MapMethod.class);
+            return className + "." + mapMethodAnn.value();
+        } catch (ClassNotFoundException e) {
+            throw new IllegalStateException("Mapper class not found: " + className, e);
+        }
+    }
+
+    /**
+     * 判断是否为 @Batch 方法
+     */
     private boolean isBatchMethod(String msId) {
         try {
             int dot = msId.lastIndexOf('.');
@@ -79,40 +125,40 @@ public class BatchSplitInterceptor implements Interceptor {
         }
     }
 
-    // 重建参数：将原 param 中的 list 替换为 subList
-    private Object rebuildParameter(Object originalParam, List<?> subList) {
-        if (originalParam instanceof List) {
-            return subList;
-        }
-        if (originalParam instanceof Map) {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> originalMap = (Map<String, Object>) originalParam;
-            Map<String, Object> newMap = new HashMap<>(originalMap);
-
-            // 替换 MyBatis 默认的 collection/list 键
-            if (newMap.containsKey("list")) {
-                newMap.put("list", subList);
-            }
-            if (newMap.containsKey("collection")) {
-                newMap.put("collection", subList);
-            }
-            return newMap;
-        }
-        // 理论上不会到这里，因为 extractList 能提取说明是 List/Map
-        return subList;
-    }
-
-
     @Override
     public Object plugin(Object target) {
-        return Plugin.wrap(target, this);
+        if (target instanceof Executor) {
+            return Plugin.wrap(target, this);
+        }
+        return target;
     }
 
     @Override
     public void setProperties(Properties props) {
-        String size = props.getProperty("maxBatchSize");
-        if (size != null) {
-            this.batchSize = Integer.parseInt(size);
+        if (props == null) {
+            return;
+        }
+
+        try {
+            String v = props.getProperty("splitThreshold");
+            if (v != null) {
+                int n = Integer.parseInt(v.trim());
+                if (n > 0) {
+                    splitThreshold = n;
+                }
+            }
+        } catch (Exception ignored) {
+        }
+
+        try {
+            String v = props.getProperty("batchChunkSize");
+            if (v != null) {
+                int n = Integer.parseInt(v.trim());
+                if (n > 0) {
+                    batchChunkSize = n;
+                }
+            }
+        } catch (Exception ignored) {
         }
     }
 }

@@ -79,7 +79,9 @@ public interface BaseRepository<T, K> {
     int insert(T entity);
 
     /**
-     * 批量插入实体（所有字段）
+     * 批量插入实体（所有字段） （高性能模式）
+     * 不保证自增主键回填,若需要回填用单个新增
+     * 禁止混合手动 ID 与 null ID
      *
      * @param entityList 实体列表，不可为 null 或空
      */
@@ -91,7 +93,9 @@ public interface BaseRepository<T, K> {
     int insertSelective(T entity);
 
     /**
-     * 批量插入实体（仅非 null 字段，推荐）
+     * 批量插入实体（仅非 null 字段，推荐） （高性能模式）
+     * 不保证自增主键回填,若需要回填用单个新增
+     * 禁止混合手动 ID 与 null ID
      *
      * @param entityList 实体列表，不可为 null 或空
      */

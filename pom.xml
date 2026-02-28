@@ -43,7 +43,7 @@
     </modules>
 
     <properties>
-        <revision>1.0.2</revision>
+        <revision>1.1.0</revision>
         <java.version>1.8</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
@@ -117,7 +117,6 @@
                 <configuration>
                     <publishingServerId>central</publishingServerId>
                     <autoPublish>true</autoPublish>
-                    <tokenAuth>true</tokenAuth>
                 </configuration>
             </plugin>
 

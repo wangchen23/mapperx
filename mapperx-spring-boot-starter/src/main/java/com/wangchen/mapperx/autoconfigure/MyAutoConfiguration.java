@@ -6,7 +6,6 @@ import com.wangchen.mapperx.core.interceptor.AutoFillInterceptor;
 import com.wangchen.mapperx.core.interceptor.BatchSplitInterceptor;
 import com.wangchen.mapperx.core.interceptor.IdGeneratorInterceptor;
 import com.wangchen.mapperx.core.spi.IdGenerator;
-import org.apache.ibatis.session.Configuration;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.ApplicationRunner;
@@ -14,6 +13,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 
 import javax.sql.DataSource;
 import java.util.Collections;
@@ -28,7 +28,7 @@ import java.util.Map;
  *
  * @author haochen78
  */
-@org.springframework.context.annotation.Configuration
+@Configuration
 @ConditionalOnClass({SqlSessionFactory.class, DataSource.class})
 public class MyAutoConfiguration {
 
@@ -73,7 +73,7 @@ public class MyAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean
     public MapConfiguration mapConfiguration(SqlSessionFactory sqlSessionFactory) {
-        Configuration mybatisConfig = sqlSessionFactory.getConfiguration();
+        org.apache.ibatis.session.Configuration mybatisConfig = sqlSessionFactory.getConfiguration();
         return new MapConfiguration(mybatisConfig);
     }
 

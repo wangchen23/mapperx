@@ -7,4 +7,5 @@ spring:
 # 可选：开启 MyBatis 日志（查看 SQL）
 logging:
   level:
-    com.wangchen.example.mapper: debug
+    com.wangchen.mapperx.example.mapper: debug
+    

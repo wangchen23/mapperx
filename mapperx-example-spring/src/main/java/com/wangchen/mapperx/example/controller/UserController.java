@@ -33,9 +33,11 @@ public class UserController {
     
     @GetMapping("/get")
     public Object get(@RequestParam Integer pageNum,@RequestParam Integer pageSize){
-        PageHelper.startPage(pageNum,pageSize);
+        //PageHelper.startPage(pageNum,pageSize);
         ConditionWrapper<UserInfoDO> wrapper = new ConditionWrapper<>();
         wrapper.eq(UserInfoDO::getAge,90);
+        wrapper.ge(UserInfoDO::getDateTime,"2026-05-28 17:56:32");
+        wrapper.lt(UserInfoDO::getDateTime,"2026-06-28 17:56:32");
         List<UserInfoDO> list = userInfoMapper.list(wrapper);
         return list;
     }

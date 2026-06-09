@@ -9,6 +9,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
+
 /**
  * UserInfoDO
  *
@@ -26,6 +28,11 @@ public class UserInfoDO {
     private String userName;
 
     private Integer age;
+
+    private LocalDateTime dateTime;
+
+    private LocalDateTime dateTimeEnd;
+    
     @LogicDelete
     private Integer isDelete;
 }

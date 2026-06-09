@@ -318,7 +318,15 @@ public class SqlFieldUtils {
         }
 
         StringBuilder where = new StringBuilder();
-        where.append(pkColumnName).append(" IN (<foreach collection=\"list\" item=\"item\" separator=\",\">").append("#{item.").append(pkFieldName).append("}</foreach>)");
+        // 使用 #{list[idx].pkFieldName} 替代 #{item.pkFieldName}，避免 foreach item 作用域问题
+        where.append(pkColumnName).append(" IN (");
+        for (int i = 0; i < entities.size(); i++) {
+            if (i > 0) {
+                where.append(", ");
+            }
+            where.append("#{list[").append(i).append("].").append(pkFieldName).append("}");
+        }
+        where.append(")");
 
         if (logicDelete != null) {
             where.append(" AND ").append(logicDelete);
@@ -349,12 +357,21 @@ public class SqlFieldUtils {
         String columnName = getColumnName(pkField);
         List<?> extractList = MybatisUtils.extractList(entity);
         if (extractList == null && entity != null) {
-            return columnName + " = #{param}";
+            return columnName + " = #{" + pkField.getName() + "}";
         }
         if ((extractList == null || extractList.isEmpty())) {
             return selective ? "1=0" : "1=1";
         }
-        return columnName + " IN (<foreach collection=\"list\" item=\"item\" separator=\",\">" + "#{item}</foreach>)";
+        // 使用 #{list[idx]}替代 #{item}，避免 foreach item 作用域问题
+        StringBuilder sb = new StringBuilder(columnName).append(" IN (");
+        for (int i = 0; i < extractList.size(); i++) {
+            if (i > 0) {
+                sb.append(", ");
+            }
+            sb.append("#{list[").append(i).append("]}");
+        }
+        sb.append(")");
+        return sb.toString();
     }
 
     // ------------------ 内部辅助方法 ------------------

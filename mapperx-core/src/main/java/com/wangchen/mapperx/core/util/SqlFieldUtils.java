@@ -69,12 +69,7 @@ public class SqlFieldUtils {
      * 生成 INSERT 的 VALUES 占位符：`"#{userName}, #{createTime}"`
      */
     public static String buildInsertValues(Object params, boolean selective) {
-        List<?> list = MybatisUtils.extractList(params);
-        if (list == null || list.isEmpty()) {
-            return buildSingleValue(params, selective, null);
-        }
-        String rowTemplate = buildSingleValue(list.get(0), selective, "item");
-        return buildBatchValues(rowTemplate);
+        return buildSingleValue(params, selective, null);
     }
 
     private static String buildSingleValue(Object entity, boolean selective, String prefix) {
@@ -103,10 +98,6 @@ public class SqlFieldUtils {
             }
         }
         return "(" + String.join(", ", values) + ")";
-    }
-
-    private static String buildBatchValues(String rowTemplate) {
-        return String.format("<foreach collection=\"list\" item=\"item\" separator=\",\">%s</foreach>", rowTemplate);
     }
 
 
@@ -178,6 +169,10 @@ public class SqlFieldUtils {
             if (field.isAnnotationPresent(PrimaryKey.class)) {
                 continue;
             }
+            // 跳过逻辑删除字段
+            if (field.isAnnotationPresent(LogicDelete.class)) {
+                continue;
+            }
 
             String fieldName = field.getName();
             Object value = meta.getValue(fieldName);
@@ -247,6 +242,11 @@ public class SqlFieldUtils {
                 }
                 pkFieldName = fieldName;
                 pkColumnName = getColumnName(field);
+                continue;
+            }
+
+            // 跳过逻辑删除字段
+            if (field.isAnnotationPresent(LogicDelete.class)) {
                 continue;
             }
 

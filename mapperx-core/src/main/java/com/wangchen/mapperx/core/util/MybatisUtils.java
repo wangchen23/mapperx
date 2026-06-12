@@ -205,13 +205,18 @@ public class MybatisUtils {
         if (parameter instanceof Map) {
             Map<String, ?> map = (Map<String, ?>) parameter;
             // MyBatis 默认会把 collection/list 包装进 map
-            Object list = map.get("list");
-            if (list instanceof List) {
-                return (List<?>) list;
+            // 使用 containsKey 避免 ParamMap.get() 抛异常
+            if (map.containsKey("list")) {
+                Object list = map.get("list");
+                if (list instanceof List) {
+                    return (List<?>) list;
+                }
             }
-            list = map.get("collection");
-            if (list instanceof List) {
-                return (List<?>) list;
+            if (map.containsKey("collection")) {
+                Object list = map.get("collection");
+                if (list instanceof List) {
+                    return (List<?>) list;
+                }
             }
         }
         return null;

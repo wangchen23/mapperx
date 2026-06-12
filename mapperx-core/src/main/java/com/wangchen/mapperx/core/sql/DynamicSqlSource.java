@@ -41,9 +41,8 @@ public class DynamicSqlSource implements SqlSource {
             throw new RuntimeException(e);
         }
         // 使用 CDATA 包裹 SQL，避免 XML 转义问题，同时保留 MyBatis 动态标签
-        String wrappedSql = "<script><![CDATA[" + sql + "]]></script>";
         SqlSource sqlSource = XML_LANGUAGE_DRIVER.createSqlSource(mappedStatement.getConfiguration(),
-                wrappedSql, Object.class);
+                sql, Object.class);
         return sqlSource.getBoundSql(parameterObject);
     }
 }

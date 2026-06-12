@@ -53,12 +53,7 @@ public class BatchSplitInterceptor implements Interceptor {
             return 0;
         }
 
-        // 小批量：走原生 <foreach>（由 MyBatis XML 处理）
-        if (list.size() <= splitThreshold) {
-            return invocation.proceed();
-        }
-
-        // === 大批量：创建独立 BatchExecutor 执行 ===
+        // ===批量：创建独立 BatchExecutor 执行 ===
         Executor originalExecutor = (Executor) invocation.getTarget();
         Configuration configuration = ms.getConfiguration();
         Transaction transaction = originalExecutor.getTransaction();

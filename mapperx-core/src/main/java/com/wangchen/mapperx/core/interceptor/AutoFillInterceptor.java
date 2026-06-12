@@ -14,6 +14,7 @@ import org.apache.ibatis.reflection.MetaObject;
 import org.apache.ibatis.reflection.SystemMetaObject;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * AutoFillInterceptor
@@ -52,6 +53,18 @@ public class AutoFillInterceptor implements Interceptor {
         if (entities != null) {
             for (Object entity : entities) {
                 performAutoFill(entity, cmd);
+            }
+            return;
+        }
+        // 处理 Map 类型参数（如 updateByCondition 方法的 entity 和 condition）
+        if (param instanceof Map) {
+            Map<?, ?> map = (Map<?, ?>) param;
+            // 使用 containsKey 避免 ParamMap.get() 抛异常
+            if (map.containsKey("entity")) {
+                Object entity = map.get("entity");
+                if (entity != null) {
+                    performAutoFill(entity, cmd);
+                }
             }
             return;
         }

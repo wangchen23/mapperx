@@ -3,6 +3,7 @@ package com.wangchen.mapperx.core.util;
 
 import com.wangchen.mapperx.core.annotation.LogicDelete;
 import com.wangchen.mapperx.core.annotation.Table;
+import com.wangchen.mapperx.core.conditions.ConditionWrapper;
 import org.apache.ibatis.mapping.MappedStatement;
 
 import java.lang.reflect.Field;
@@ -11,6 +12,7 @@ import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -229,6 +231,29 @@ public class MybatisUtils {
         if (columnName == null || !columnName.matches("^[a-zA-Z_][a-zA-Z0-9_]*$")) {
             throw new IllegalArgumentException("Invalid SQL column name: '" + columnName + "'");
         }
+    }
+
+    /**
+     * 构建 ORDER BY 子句
+     */
+    public static String buildOrderByClause(ConditionWrapper<?> condition) {
+        if (condition == null || condition.getOrders().isEmpty()) {
+            return "";
+        }
+        String orderPart = condition.getOrders().stream()
+                .map(order -> order.getColumn() + (order.isAscending() ? " ASC" : " DESC"))
+                .collect(Collectors.joining(", "));
+        return " ORDER BY " + orderPart;
+    }
+
+    /**
+     * 构建 GROUP BY 子句
+     */
+    public static String buildGroupByClause(ConditionWrapper<?> condition) {
+        if (condition == null || condition.getGroups().isEmpty()) {
+            return "";
+        }
+        return " GROUP BY " + String.join(", ", condition.getGroups());
     }
 
 }

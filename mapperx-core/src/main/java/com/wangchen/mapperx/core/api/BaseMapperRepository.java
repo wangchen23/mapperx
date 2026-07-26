@@ -28,7 +28,7 @@ public interface BaseMapperRepository<T, K> extends BaseRepository<T, K> {
     boolean existsById(K id);
 
     @Override
-    @MapMethod("existsById")
+    @SqlCommand(SqlCommandType.SELECT)
     boolean existsByCondition(ConditionWrapper<T> condition);
 
     @Override
@@ -36,7 +36,7 @@ public interface BaseMapperRepository<T, K> extends BaseRepository<T, K> {
     T selectOne(ConditionWrapper<T> condition);
 
     @Override
-    @MapMethod("getById")
+    @SqlCommand(SqlCommandType.SELECT)
     List<T> list(ConditionWrapper<T> condition);
 
     @Override
@@ -44,7 +44,7 @@ public interface BaseMapperRepository<T, K> extends BaseRepository<T, K> {
     List<T> listByIds(List<K> idList);
 
     @Override
-    @MapMethod("existsById")
+    @SqlCommand(SqlCommandType.SELECT)
     long count(ConditionWrapper<T> condition);
 
     @Override
@@ -121,7 +121,7 @@ public interface BaseMapperRepository<T, K> extends BaseRepository<T, K> {
     int batchLogicDelete(List<K> idList);
 
     @Override
-    @MapMethod(value = "logicDelete")
+    @SqlCommand(SqlCommandType.UPDATE)
     int logicDeleteByCondition(ConditionWrapper<T> condition);
 
     @Override
@@ -134,6 +134,6 @@ public interface BaseMapperRepository<T, K> extends BaseRepository<T, K> {
     int batchDelete(List<K> idList);
 
     @Override
-    @MapMethod(value = "delete")
+    @SqlCommand(SqlCommandType.DELETE)
     int deleteByCondition(ConditionWrapper<T> condition);
 }

@@ -11,7 +11,11 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * UserInfoMapper 完整测试类
@@ -34,7 +38,7 @@ public class UserInfoMapperTest {
         entity.setUserName("测试用户_insert");
         entity.setAge(25);
         entity.setIsDelete(0);
-        
+
         int result = userInfoMapper.insert(entity);
         assertTrue(result > 0);
         assertNotNull(entity.getId());
@@ -133,17 +137,17 @@ public class UserInfoMapperTest {
     @Test
     public void testList() {
         // 先插入几条数据
-        for (int i = 0; i < 3; i++) {
-            UserInfoDO entity = new UserInfoDO();
-            entity.setUserName("list测试_" + i);
-            entity.setAge(40 + i);
-            userInfoMapper.insertSelective(entity);
-        }
+        //for (int i = 0; i < 3; i++) {
+        //    UserInfoDO entity = new UserInfoDO();
+        //    entity.setUserName("list测试_" + i);
+        //    entity.setAge(40 + i);
+        //    userInfoMapper.insertSelective(entity);
+        //}
 
         // 条件查询
         ConditionWrapper<UserInfoDO> wrapper = new ConditionWrapper<>();
         wrapper.like(UserInfoDO::getUserName, "list测试_");
-
+        wrapper.orderByDesc(UserInfoDO::getDateTime);
         List<UserInfoDO> result = userInfoMapper.list(wrapper);
         assertNotNull(result);
         assertTrue(result.size() >= 3);

@@ -41,14 +41,18 @@ public class DynamicSQLProvider {
     }
 
     public String selectOne(Object entity, MappedStatement ms) {
+        @SuppressWarnings("unchecked")
+        ConditionWrapper<Object> condition = (ConditionWrapper<Object>) entity;
         StringBuilder sql = new StringBuilder();
         sql.append("SELECT ");
         sql.append(String.join(",", MybatisUtils.getColumnsByMs(ms)));
         sql.append(" FROM ");
         sql.append(MybatisUtils.getTableNameByMs(ms));
         sql.append(" WHERE ");
-        sql.append(SqlFieldUtils.buildWhereId(ms, entity, true));
+        sql.append(SqlFieldUtils.buildWhereClause(condition, null));
         sql.append(MybatisUtils.getDeleteFilterSql(ms));
+        sql.append(MybatisUtils.buildGroupByClause(condition));
+        sql.append(MybatisUtils.buildOrderByClause(condition));
         sql.append(" LIMIT 1");
         return sql.toString();
     }
@@ -63,6 +67,71 @@ public class DynamicSQLProvider {
         sql.append(SqlFieldUtils.buildWhereId(ms, entity, true));
         sql.append(MybatisUtils.getDeleteFilterSql(ms));
         sql.append(" FOR UPDATE");
+        return sql.toString();
+    }
+
+    public String list(Object conditionObj, MappedStatement ms) {
+        @SuppressWarnings("unchecked")
+        ConditionWrapper<Object> condition = (ConditionWrapper<Object>) conditionObj;
+        StringBuilder sql = new StringBuilder();
+        sql.append("SELECT ");
+        sql.append(String.join(",", MybatisUtils.getColumnsByMs(ms)));
+        sql.append(" FROM ");
+        sql.append(MybatisUtils.getTableNameByMs(ms));
+        sql.append(" WHERE ");
+        sql.append(SqlFieldUtils.buildWhereClause(condition, null));
+        sql.append(MybatisUtils.getDeleteFilterSql(ms));
+        sql.append(MybatisUtils.buildGroupByClause(condition));
+        sql.append(MybatisUtils.buildOrderByClause(condition));
+        return sql.toString();
+    }
+
+    public String existsByCondition(Object conditionObj, MappedStatement ms) {
+        @SuppressWarnings("unchecked")
+        ConditionWrapper<Object> condition = (ConditionWrapper<Object>) conditionObj;
+        StringBuilder sql = new StringBuilder();
+        sql.append("SELECT COUNT(1) FROM ");
+        sql.append(MybatisUtils.getTableNameByMs(ms));
+        sql.append(" WHERE ");
+        sql.append(SqlFieldUtils.buildWhereClause(condition, null));
+        sql.append(MybatisUtils.getDeleteFilterSql(ms));
+        sql.append(" LIMIT 1");
+        return sql.toString();
+    }
+
+    public String count(Object conditionObj, MappedStatement ms) {
+        @SuppressWarnings("unchecked")
+        ConditionWrapper<Object> condition = (ConditionWrapper<Object>) conditionObj;
+        StringBuilder sql = new StringBuilder();
+        sql.append("SELECT COUNT(1) FROM ");
+        sql.append(MybatisUtils.getTableNameByMs(ms));
+        sql.append(" WHERE ");
+        sql.append(SqlFieldUtils.buildWhereClause(condition, null));
+        sql.append(MybatisUtils.getDeleteFilterSql(ms));
+        return sql.toString();
+    }
+
+    public String logicDeleteByCondition(Object conditionObj, MappedStatement ms) {
+        @SuppressWarnings("unchecked")
+        ConditionWrapper<Object> condition = (ConditionWrapper<Object>) conditionObj;
+        StringBuilder sql = new StringBuilder();
+        sql.append("UPDATE ");
+        sql.append(MybatisUtils.getTableNameByMs(ms));
+        sql.append(" SET ");
+        sql.append(SqlFieldUtils.buildLogicColumns(ms));
+        sql.append(" WHERE ");
+        sql.append(SqlFieldUtils.buildWhereClause(condition, null));
+        return sql.toString();
+    }
+
+    public String deleteByCondition(Object conditionObj, MappedStatement ms) {
+        @SuppressWarnings("unchecked")
+        ConditionWrapper<Object> condition = (ConditionWrapper<Object>) conditionObj;
+        StringBuilder sql = new StringBuilder();
+        sql.append("DELETE FROM ");
+        sql.append(MybatisUtils.getTableNameByMs(ms));
+        sql.append(" WHERE ");
+        sql.append(SqlFieldUtils.buildWhereClause(condition, null));
         return sql.toString();
     }
 
@@ -91,7 +160,8 @@ public class DynamicSQLProvider {
     }
 
     public String updateByConditionWithFields(Object entity, MappedStatement ms) {
-        @SuppressWarnings("unchecked") Map<String, Object> paramMap = (Map<String, Object>) entity;
+        @SuppressWarnings("unchecked")
+        Map<String, Object> paramMap = (Map<String, Object>) entity;
         UpdateSpec<?> updateSpec = (UpdateSpec<?>) paramMap.get("updateSpec");
         ConditionWrapper<?> condition = (ConditionWrapper<?>) paramMap.get("condition");
         StringBuilder sql = new StringBuilder();
@@ -147,7 +217,8 @@ public class DynamicSQLProvider {
     }
 
     private String updateByCondition(Object entity, boolean selective, MappedStatement ms) {
-        @SuppressWarnings("unchecked") Map<String, Object> paramMap = (Map<String, Object>) entity;
+        @SuppressWarnings("unchecked")
+        Map<String, Object> paramMap = (Map<String, Object>) entity;
         Object targetEntity = paramMap.get("entity");
         Object conditionObj = paramMap.get("condition");
         ConditionWrapper<?> condition = (ConditionWrapper<?>) conditionObj;

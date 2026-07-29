@@ -20,6 +20,19 @@ public @interface Column {
     // 字段映射
     String value() default "";
 
-    // 自动填充时机
-    FieldFill fill() default FieldFill.NEVER;
+    // 填充类型
+    FillType fillType() default FillType.NEVER;
+
+    // 填充取值方法：参数为操作类型（INSERT/UPDATE）
+    // 支持全路径格式：com.xxx.UserService.fillCreateTime（方法需为静态方法，参数为 FillType）
+    // 或直接写方法名（在实体类上查找实例方法）
+    String fillMethod() default "";
+
+    // 过滤类型
+    FilterType filterType() default FilterType.NEVER;
+
+    // 过滤取值方法：参数为操作类型（SELECT/UPDATE/DELETE）
+    // 支持全路径格式：com.xxx.UserService.filterStatus（方法需为静态方法，参数为 FilterType）
+    // 或直接写方法名（在实体类上查找实例方法）
+    String filterMethod() default "";
 }

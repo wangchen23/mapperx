@@ -1,8 +1,6 @@
 package com.wangchen.mapperx.autoconfigure;
 
 import com.wangchen.mapperx.core.config.MapConfiguration;
-import com.wangchen.mapperx.core.handler.MetaObjectHandler;
-import com.wangchen.mapperx.core.interceptor.AutoFillInterceptor;
 import com.wangchen.mapperx.core.interceptor.BatchSplitInterceptor;
 import com.wangchen.mapperx.core.interceptor.IdGeneratorInterceptor;
 import com.wangchen.mapperx.core.spi.IdGenerator;
@@ -42,17 +40,6 @@ public class MyAutoConfiguration {
     public IdGeneratorInterceptor idGeneratorInterceptor(@Autowired(required = false) Map<String, IdGenerator<?>> idGeneratorMap) {
         Map<String, IdGenerator<?>> idGenerators = idGeneratorMap == null ? Collections.emptyMap() : idGeneratorMap;
         return new IdGeneratorInterceptor(idGenerators);
-    }
-
-    /**
-     * 自动填充拦截器
-     * 特性：仅当存在 MetaObjectHandler 时创建（避免无处理器时加载）
-     */
-    @Bean
-    @ConditionalOnBean(MetaObjectHandler.class)
-    @ConditionalOnMissingBean
-    public AutoFillInterceptor autoFillInterceptor(MetaObjectHandler handler) {
-        return new AutoFillInterceptor(handler);
     }
 
     /**

@@ -23,28 +23,23 @@ import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * MyBatis 批量操作智能拦截器（线程安全、无日志依赖版）
- * - 小批量（≤ threshold）：走原生 <foreach> 批量（高性能）
- * - 大批量（> threshold）：创建独立 BatchExecutor 单条循环执行（防 OOM / SQL 过长）
+ * 批量操作拦截器
+ * 通过 @Batch 注解将集合参数转换为 JDBC 批量执行
  *
  * @author chenwang
  */
 @Intercepts(@Signature(type = Executor.class, method = "update", args = {MappedStatement.class, Object.class}))
 public class BatchSplitInterceptor implements Interceptor {
 
-    private static final Map<String, Boolean> IS_BATCH_METHOD = new ConcurrentHashMap<>();
-    private static final Map<String, String> BATCH_TO_SINGLE_MS_ID = new ConcurrentHashMap<>();
-
-    private int splitThreshold = 1000;
-    private int batchChunkSize = 300;
+    private static final Map<String, Boolean> BATCH_METHOD_CACHE = new ConcurrentHashMap<>();
+    private static final Map<String, String> SINGLE_MS_ID_CACHE = new ConcurrentHashMap<>();
 
     @Override
     public Object intercept(Invocation invocation) throws Throwable {
         MappedStatement ms = (MappedStatement) invocation.getArgs()[0];
         Object param = invocation.getArgs()[1];
 
-        // 非 @Batch 方法直接放行
-        if (!IS_BATCH_METHOD.computeIfAbsent(ms.getId(), this::isBatchMethod)) {
+        if (!isBatchMethod(ms.getId())) {
             return invocation.proceed();
         }
 
@@ -53,107 +48,76 @@ public class BatchSplitInterceptor implements Interceptor {
             return 0;
         }
 
-        // ===批量：创建独立 BatchExecutor 执行 ===
+        return executeBatch(invocation, ms, list);
+    }
+
+    private int executeBatch(Invocation invocation, MappedStatement ms, List<?> list) {
         Executor originalExecutor = (Executor) invocation.getTarget();
         Configuration configuration = ms.getConfiguration();
         Transaction transaction = originalExecutor.getTransaction();
 
-        // 获取对应的单条操作 MappedStatement
-        String singleMsId = BATCH_TO_SINGLE_MS_ID.computeIfAbsent(ms.getId(), this::deriveSingleMsId);
+        String singleMsId = getSingleMsId(ms.getId());
         MappedStatement singleMs = configuration.getMappedStatement(singleMsId, false);
+        if (singleMs == null) {
+            throw new IllegalStateException("Cannot find mappedStatement specified by @MapMethod, id: " + singleMsId);
+        }
 
-        // 创建独立的 BatchExecutor（复用当前事务，线程安全）
         Executor batchExecutor = configuration.newExecutor(transaction, ExecutorType.BATCH);
 
-        int total = 0;
-        int count = 0;
         try {
             for (Object item : list) {
                 batchExecutor.update(singleMs, item);
-                total++;
-                count++;
-                if (count >= batchChunkSize) {
-                    batchExecutor.flushStatements();
-                    count = 0;
-                }
             }
-            // 执行所有 pending 的 batch 语句（但不提交）
             batchExecutor.flushStatements();
-            return total;
+            return list.size();
         } catch (Exception e) {
-            throw new PersistenceException("Batch method [" + ms.getId() + "] failed after processing " + total + " items", e);
+            throw new PersistenceException("Batch method [" + ms.getId() + "] execute failed.", e);
+        } finally {
+            batchExecutor.close(false);
         }
     }
 
-    /**
-     * 根据 @MapMethod 注解获取单条方法 ID（强约定：有 @Batch 必有 @MapMethod）
-     */
-    private String deriveSingleMsId(String batchMsId) {
-        int lastDot = batchMsId.lastIndexOf('.');
-        String className = batchMsId.substring(0, lastDot);
-        String methodName = batchMsId.substring(lastDot + 1);
-
-        try {
-            Class<?> mapperClass = Class.forName(className);
-            Method batchMethod = ClassUtils.getPublicMethod(mapperClass, methodName);
-            MapMethod mapMethodAnn = batchMethod.getAnnotation(MapMethod.class);
-            return className + "." + mapMethodAnn.value();
-        } catch (ClassNotFoundException e) {
-            throw new IllegalStateException("Mapper class not found: " + className, e);
-        }
-    }
-
-    /**
-     * 判断是否为 @Batch 方法
-     */
     private boolean isBatchMethod(String msId) {
-        try {
-            int dot = msId.lastIndexOf('.');
-            String className = msId.substring(0, dot);
-            String methodName = msId.substring(dot + 1);
-
-            Class<?> mapperClass = Class.forName(className);
-            Method method = ClassUtils.getPublicMethod(mapperClass, methodName);
+        return BATCH_METHOD_CACHE.computeIfAbsent(msId, id -> {
+            Method method = getMapperMethod(id);
             return method != null && method.isAnnotationPresent(Batch.class);
-        } catch (Exception e) {
-            return false;
+        });
+    }
+
+    private String getSingleMsId(String batchMsId) {
+        return SINGLE_MS_ID_CACHE.computeIfAbsent(batchMsId, id -> {
+            Method batchMethod = getMapperMethod(id);
+            if (batchMethod == null) {
+                throw new IllegalStateException("Batch method not found: " + id);
+            }
+            MapMethod mapMethod = batchMethod.getAnnotation(MapMethod.class);
+            if (mapMethod == null) {
+                throw new IllegalStateException("@MapMethod annotation missing on batch method: " + id);
+            }
+            int lastDot = id.lastIndexOf('.');
+            return id.substring(0, lastDot + 1) + mapMethod.value();
+        });
+    }
+
+    private Method getMapperMethod(String msId) {
+        int lastDot = msId.lastIndexOf('.');
+        String className = msId.substring(0, lastDot);
+        String methodName = msId.substring(lastDot + 1);
+        try {
+            Class<?> mapperClass = Class.forName(className);
+            return ClassUtils.getMethod(mapperClass, methodName);
+        } catch (ClassNotFoundException e) {
+            return null;
         }
     }
 
     @Override
     public Object plugin(Object target) {
-        if (target instanceof Executor) {
-            return Plugin.wrap(target, this);
-        }
-        return target;
+        return target instanceof Executor ? Plugin.wrap(target, this) : target;
     }
 
     @Override
     public void setProperties(Properties props) {
-        if (props == null) {
-            return;
-        }
-
-        try {
-            String v = props.getProperty("splitThreshold");
-            if (v != null) {
-                int n = Integer.parseInt(v.trim());
-                if (n > 0) {
-                    splitThreshold = n;
-                }
-            }
-        } catch (Exception ignored) {
-        }
-
-        try {
-            String v = props.getProperty("batchChunkSize");
-            if (v != null) {
-                int n = Integer.parseInt(v.trim());
-                if (n > 0) {
-                    batchChunkSize = n;
-                }
-            }
-        } catch (Exception ignored) {
-        }
+        // no-op
     }
 }

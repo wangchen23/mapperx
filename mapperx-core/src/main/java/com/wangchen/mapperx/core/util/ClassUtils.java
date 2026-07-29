@@ -1,57 +1,50 @@
 package com.wangchen.mapperx.core.util;
 
-
-import com.wangchen.mapperx.core.annotation.Column;
-import com.wangchen.mapperx.core.annotation.FieldFill;
 import org.apache.ibatis.reflection.SystemMetaObject;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * ClassUtils - 基于 MyBatis SystemMetaObject 重构版
+ * ClassUtils - 基于 MyBatis SystemMetaObject
  *
  * @author chenwang
  */
 public class ClassUtils {
 
+    // 字段缓存：Class -> (字段名 -> Field)
     private static final Map<Class<?>, Map<String, Field>> FIELD_CACHE = new ConcurrentHashMap<>();
-    private static final Map<Class<?>, Map<String, Method>> METHOD_CACHE = new ConcurrentHashMap<>();
 
-    private static final Map<String, Object> GENERAL_CACHE = new ConcurrentHashMap<>();
-    public static Map<String, Object> getCache() {
-        return GENERAL_CACHE;
-    }
+    // 方法缓存：key 格式 "className#methodName" 或 "full.method.name"
+    private static final Map<String, Method> METHOD_CACHE = new ConcurrentHashMap<>();
+
+    // 字段按注解缓存：Class -> (AnnotationClass -> List<Field>)
+    private static final Map<Class<?>, Map<Class<? extends Annotation>, java.util.List<Field>>> FIELD_BY_ANNOTATION_CACHE = new ConcurrentHashMap<>();
 
     /**
      * 获取类中带有指定注解的所有字段（包含父类）
      */
-    public static List<Field> getFieldsByAnnotation(Class<?> clazz, Class<? extends Annotation> annotationClass) {
-        Map<String, Field> fieldMap = getFieldMap(clazz);
-        List<Field> result = new ArrayList<>();
-        for (Field field : fieldMap.values()) {
-            if (field.isAnnotationPresent(annotationClass)) {
-                result.add(field);
+    public static java.util.List<Field> getFieldsByAnnotation(Class<?> clazz, Class<? extends Annotation> annotationClass) {
+        Map<Class<? extends Annotation>, java.util.List<Field>> annotationMap = FIELD_BY_ANNOTATION_CACHE.computeIfAbsent(clazz, k -> new ConcurrentHashMap<>());
+        return annotationMap.computeIfAbsent(annotationClass, k -> {
+            java.util.List<Field> result = new java.util.ArrayList<>();
+            for (Field field : getFieldMap(clazz).values()) {
+                if (field.isAnnotationPresent(k)) {
+                    result.add(field);
+                }
             }
-        }
-        return result;
+            return result;
+        });
     }
 
     /**
-     * 设置对象字段值（自动处理 private / getter/setter / Map）
+     * 获取字段 Map（包含父类所有字段）
      */
-    public static void setFieldValue(Object target, String fieldName, Object value) {
-        SystemMetaObject.forObject(target).setValue(fieldName, value);
-    }
-
-
     public static Map<String, Field> getFieldMap(Class<?> clazz) {
         return FIELD_CACHE.computeIfAbsent(clazz, ClassUtils::buildFieldMap);
     }
@@ -64,10 +57,8 @@ public class ClassUtils {
                 if (Modifier.isStatic(f.getModifiers()) || Modifier.isTransient(f.getModifiers())) {
                     continue;
                 }
-                // 父类字段优先级低于子类（只保留第一次出现的）
-                if (!map.containsKey(f.getName())) {
-                    map.put(f.getName(), f);
-                }
+                // 子类字段覆盖父类字段
+                map.putIfAbsent(f.getName(), f);
             }
             c = c.getSuperclass();
         }
@@ -75,43 +66,54 @@ public class ClassUtils {
     }
 
     /**
-     * 对外公开的工具方法：获取类中指定名称的 public 方法（带缓存）
+     * 通过全路径获取静态方法（带缓存）
+     *
+     * @param fullMethodName 完整方法名，格式：com.xxx.Service.methodName
+     * @param paramType      方法参数类型
+     * @return 方法对象，未找到返回 null
      */
-    public static Method getPublicMethod(Class<?> clazz, String methodName) {
-        return METHOD_CACHE.computeIfAbsent(clazz, ClassUtils::buildMethodMap).get(methodName);
-    }
-
-    private static Map<String, Method> buildMethodMap(Class<?> clazz) {
-        // 包含父接口和 Object 的 public 方法
-        Method[] methods = clazz.getMethods();
-        Map<String, Method> map = new ConcurrentHashMap<>(methods.length);
-        for (Method method : methods) {
-            // 注意：如果有重载，后出现的方法会覆盖前面的！
-            map.put(method.getName(), method);
-        }
-        return map;
+    public static Method getGlobalMethod(String fullMethodName, Class<?> paramType) {
+        return METHOD_CACHE.computeIfAbsent(fullMethodName, k -> {
+            int lastDotIndex = k.lastIndexOf('.');
+            String className = k.substring(0, lastDotIndex);
+            String methodName = k.substring(lastDotIndex + 1);
+            try {
+                Class<?> clazz = Class.forName(className);
+                return clazz.getMethod(methodName, paramType);
+            } catch (Exception e) {
+                return null;
+            }
+        });
     }
 
     /**
-     * 判断字段在指定填充时机下是否需要填充
+     * 获取类的 public 方法（带缓存）
+     *
+     * @param clazz      目标类
+     * @param methodName 方法名
+     * @return 方法对象，未找到返回 null
      */
-    public static boolean shouldFill(Object target, String fieldName, FieldFill operationType) {
-        if (target == null || fieldName == null) {
-            return false;
-        }
+    public static Method getMethod(Class<?> clazz, String methodName) {
+        return METHOD_CACHE.computeIfAbsent(clazz.getName() + "#" + methodName, k -> {
+            try {
+                return clazz.getMethod(methodName);
+            } catch (Exception e) {
+                return null;
+            }
+        });
+    }
 
-        Field field = getFieldMap(target.getClass()).get(fieldName);
-        if (field == null || !field.isAnnotationPresent(Column.class)) {
-            return false;
-        }
+    /**
+     * 设置对象字段值（自动处理 private / getter/setter / Map）
+     */
+    public static void setFieldValue(Object target, String fieldName, Object value) {
+        SystemMetaObject.forObject(target).setValue(fieldName, value);
+    }
 
-        Column annotation = field.getAnnotation(Column.class);
-        FieldFill fillType = annotation.fill();
-
-        // 匹配逻辑
-        if (fillType == FieldFill.INSERT_UPDATE) {
-            return true;
-        }
-        return fillType == operationType;
+    /**
+     * 获取对象字段值（自动处理 private / getter / Map）
+     */
+    public static Object getFieldValue(Object target, String fieldName) {
+        return SystemMetaObject.forObject(target).getValue(fieldName);
     }
 }

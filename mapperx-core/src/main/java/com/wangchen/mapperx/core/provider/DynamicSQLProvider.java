@@ -101,7 +101,9 @@ public class DynamicSQLProvider {
         sql.append(" SET ");
         sql.append(SqlFieldUtils.buildSetClauseForUpdateSpec(updateSpec));
         sql.append(" WHERE 1=1");
+        // todo 默认过滤 无
         sql.append(SqlFieldUtils.buildWhereClause(condition, "condition"));
+        sql.append(MybatisUtils.getDeleteFilterSql(ms));
         return sql.toString();
     }
 
@@ -112,7 +114,8 @@ public class DynamicSQLProvider {
         sql.append(" SET ");
         sql.append(MybatisUtils.getLogicColumn(ms));
         sql.append(" WHERE ");
-        sql.append(SqlFieldUtils.buildWhereId(ms, entity));
+        sql.append(SqlFieldUtils.buildWhereId(entity));
+        sql.append(MybatisUtils.getDeleteFilterSql(ms));
         return sql.toString();
     }
 
@@ -121,7 +124,8 @@ public class DynamicSQLProvider {
         sql.append("DELETE FROM ");
         sql.append(MybatisUtils.getTableNameByMs(ms));
         sql.append(" WHERE ");
-        sql.append(SqlFieldUtils.buildWhereId(ms, entity));
+        sql.append(SqlFieldUtils.buildWhereId(entity));
+        sql.append(MybatisUtils.getDeleteFilterSql(ms));
         return sql.toString();
     }
 
@@ -145,7 +149,9 @@ public class DynamicSQLProvider {
         sql.append(" SET ");
         sql.append(SqlFieldUtils.buildSetClause(entity, selective, null));
         sql.append(" WHERE ");
-        sql.append(SqlFieldUtils.buildWhereClause(entity));
+        // todo 默认过滤 有
+        sql.append(SqlFieldUtils.buildWhereId(entity));
+        sql.append(MybatisUtils.getDeleteFilterSql(ms));
         return sql.toString();
     }
 
@@ -162,7 +168,9 @@ public class DynamicSQLProvider {
         sql.append(" SET ");
         sql.append(SqlFieldUtils.buildSetClause(targetEntity, selective, "entity"));
         sql.append(" WHERE 1=1");
+        // todo 默认过滤 有
         sql.append(SqlFieldUtils.buildWhereClause(condition, "condition"));
+        sql.append(MybatisUtils.getDeleteFilterSql(ms));
         return sql.toString();
     }
 
@@ -173,6 +181,7 @@ public class DynamicSQLProvider {
         sql.append(" FROM ");
         sql.append(MybatisUtils.getTableNameByMs(ms));
         sql.append(" WHERE 1=1");
+        // todo 默认过滤 无
         sql.append(SqlFieldUtils.buildWhereClause(condition, null));
         sql.append(MybatisUtils.getDeleteFilterSql(ms));
         sql.append(MybatisUtils.buildGroupByClause(condition));
@@ -190,7 +199,7 @@ public class DynamicSQLProvider {
         sql.append(" FROM ");
         sql.append(MybatisUtils.getTableNameByMs(ms));
         sql.append(" WHERE ");
-        sql.append(SqlFieldUtils.buildWhereId(ms, entity));
+        sql.append(SqlFieldUtils.buildWhereId(entity));
         sql.append(MybatisUtils.getDeleteFilterSql(ms));
         if (forUpdate) {
             sql.append(" FOR UPDATE");
@@ -203,6 +212,7 @@ public class DynamicSQLProvider {
         sql.append("SELECT COUNT(1) FROM ");
         sql.append(MybatisUtils.getTableNameByMs(ms));
         sql.append(" WHERE 1=1");
+        // todo 默认过滤 无
         sql.append(SqlFieldUtils.buildWhereClause(condition, null));
         sql.append(MybatisUtils.getDeleteFilterSql(ms));
         if (withLimit) {
@@ -220,7 +230,9 @@ public class DynamicSQLProvider {
             sql.append(MybatisUtils.getLogicColumn(ms));
         }
         sql.append(" WHERE 1=1");
+        // todo 默认过滤 无
         sql.append(SqlFieldUtils.buildWhereClause(condition, null));
+        sql.append(MybatisUtils.getDeleteFilterSql(ms));
         return sql.toString();
     }
 

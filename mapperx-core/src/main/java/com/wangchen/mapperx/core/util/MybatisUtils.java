@@ -25,6 +25,7 @@ public class MybatisUtils {
     private static final Map<String, Class<?>> CLASS_CACHE = new ConcurrentHashMap<>();
     private static final Map<String, List<String>> COLUMN_NAME_CACHE = new ConcurrentHashMap<>();
     private static final Map<String, String> DELETE_SQL_CACHE = new ConcurrentHashMap<>();
+    private static final Map<String, String> LOGIC_COLUMN_CACHE = new ConcurrentHashMap<>();
 
 
     /**
@@ -99,6 +100,27 @@ public class MybatisUtils {
                 break;
             }
         }
+        return sql;
+    }
+
+    /**
+     * 获取逻辑删除字段的 SET 子句
+     */
+    public static String getLogicColumn(MappedStatement ms) {
+        String msId = ms.getId();
+        if (LOGIC_COLUMN_CACHE.containsKey(msId)) {
+            return LOGIC_COLUMN_CACHE.get(msId);
+        }
+        Class<?> entityClass = getEntityClassByMs(ms);
+        List<Field> fields = ClassUtils.getFieldsByAnnotation(entityClass, LogicDelete.class);
+        if (fields.size() != 1) {
+            throw new IllegalStateException("Entity [" + entityClass.getSimpleName() + "] must have exactly one @LogicDelete field");
+        }
+        Field field = fields.get(0);
+        String columnName = SqlFieldUtils.getColumnName(field);
+        LogicDelete anno = field.getAnnotation(LogicDelete.class);
+        String sql = columnName + " = " + anno.deleted();
+        LOGIC_COLUMN_CACHE.put(msId, sql);
         return sql;
     }
 

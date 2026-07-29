@@ -7,7 +7,6 @@ import com.wangchen.mapperx.core.annotation.PrimaryKey;
 import com.wangchen.mapperx.core.conditions.Condition;
 import com.wangchen.mapperx.core.conditions.ConditionWrapper;
 import com.wangchen.mapperx.core.conditions.UpdateSpec;
-import org.apache.ibatis.mapping.MappedStatement;
 import org.apache.ibatis.reflection.MetaObject;
 import org.apache.ibatis.reflection.SystemMetaObject;
 

@@ -95,6 +95,11 @@ public class DynamicSQLProvider {
         Map<String, Object> paramMap = (Map<String, Object>) entity;
         UpdateSpec<?> updateSpec = (UpdateSpec<?>) paramMap.get("updateSpec");
         ConditionWrapper<?> condition = (ConditionWrapper<?>) paramMap.get("condition");
+
+        // 自动填充：获取实体类，处理需要自动填充的字段
+        Class<?> entityClass = MybatisUtils.getEntityClassByMs(ms);
+        FieldFillUtil.fillUpdateSpec(updateSpec, entityClass, FillType.UPDATE);
+
         StringBuilder sql = new StringBuilder();
         sql.append("UPDATE ");
         sql.append(MybatisUtils.getTableNameByMs(ms));

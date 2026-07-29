@@ -87,16 +87,24 @@ public class ClassUtils {
     }
 
     /**
-     * 获取类的 public 方法（带缓存）
+     * 获取类中指定参数类型的public方法（带缓存）
      *
      * @param clazz      目标类
      * @param methodName 方法名
-     * @return 方法对象，未找到返回 null
+     * @param paramTypes 参数类型数组，空数组代表无参
+     * @return Method，找不到返回null
      */
-    public static Method getMethod(Class<?> clazz, String methodName) {
-        return METHOD_CACHE.computeIfAbsent(clazz.getName() + "#" + methodName, k -> {
+    public static Method getMethod(Class<?> clazz, String methodName, Class<?>... paramTypes) {
+        StringBuilder keySb = new StringBuilder(128);
+        keySb.append(clazz.getName()).append("#").append(methodName);
+        for (Class<?> p : paramTypes) {
+            keySb.append("|").append(p.getName());
+        }
+        String key = keySb.toString();
+
+        return METHOD_CACHE.computeIfAbsent(key, k -> {
             try {
-                return clazz.getMethod(methodName);
+                return clazz.getMethod(methodName, paramTypes);
             } catch (Exception e) {
                 return null;
             }

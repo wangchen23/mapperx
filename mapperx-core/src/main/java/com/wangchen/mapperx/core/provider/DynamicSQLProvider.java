@@ -1,7 +1,9 @@
 package com.wangchen.mapperx.core.provider;
 
+import com.wangchen.mapperx.core.annotation.FillType;
 import com.wangchen.mapperx.core.conditions.ConditionWrapper;
 import com.wangchen.mapperx.core.conditions.UpdateSpec;
+import com.wangchen.mapperx.core.util.FieldFillUtil;
 import com.wangchen.mapperx.core.util.MybatisUtils;
 import com.wangchen.mapperx.core.util.SqlFieldUtils;
 import org.apache.ibatis.mapping.MappedStatement;
@@ -17,122 +19,51 @@ import java.util.Map;
 public class DynamicSQLProvider {
 
     public String getById(Object entity, MappedStatement ms) {
-        StringBuilder sql = new StringBuilder();
-        sql.append("SELECT ");
-        sql.append(String.join(",", MybatisUtils.getColumnsByMs(ms)));
-        sql.append(" FROM ");
-        sql.append(MybatisUtils.getTableNameByMs(ms));
-        sql.append(" WHERE ");
-        sql.append(SqlFieldUtils.buildWhereId(ms, entity, false));
-        sql.append(MybatisUtils.getDeleteFilterSql(ms));
-        return sql.toString();
+        return buildSelectByIdSql(entity, ms, false, false);
     }
 
     public String existsById(Object entity, MappedStatement ms) {
-        StringBuilder sql = new StringBuilder();
-        sql.append("SELECT ");
-        sql.append("COUNT(1)");
-        sql.append(" FROM ");
-        sql.append(MybatisUtils.getTableNameByMs(ms));
-        sql.append(" WHERE ");
-        sql.append(SqlFieldUtils.buildWhereId(ms, entity, true));
-        sql.append(MybatisUtils.getDeleteFilterSql(ms));
-        return sql.toString();
+        return buildSelectByIdSql(entity, ms, true, false);
     }
 
-    public String selectOne(Object entity, MappedStatement ms) {
+    public String selectOne(Object conditionObj, MappedStatement ms) {
         @SuppressWarnings("unchecked")
-        ConditionWrapper<Object> condition = (ConditionWrapper<Object>) entity;
-        StringBuilder sql = new StringBuilder();
-        sql.append("SELECT ");
-        sql.append(String.join(",", MybatisUtils.getColumnsByMs(ms)));
-        sql.append(" FROM ");
-        sql.append(MybatisUtils.getTableNameByMs(ms));
-        sql.append(" WHERE ");
-        sql.append(SqlFieldUtils.buildWhereClause(condition, null));
-        sql.append(MybatisUtils.getDeleteFilterSql(ms));
-        sql.append(MybatisUtils.buildGroupByClause(condition));
-        sql.append(MybatisUtils.buildOrderByClause(condition));
-        sql.append(" LIMIT 1");
-        return sql.toString();
+        ConditionWrapper<Object> condition = (ConditionWrapper<Object>) conditionObj;
+        return buildSelectSql(condition, ms, true);
     }
 
     public String lockById(Object entity, MappedStatement ms) {
-        StringBuilder sql = new StringBuilder();
-        sql.append("SELECT ");
-        sql.append(String.join(",", MybatisUtils.getColumnsByMs(ms)));
-        sql.append(" FROM ");
-        sql.append(MybatisUtils.getTableNameByMs(ms));
-        sql.append(" WHERE ");
-        sql.append(SqlFieldUtils.buildWhereId(ms, entity, true));
-        sql.append(MybatisUtils.getDeleteFilterSql(ms));
-        sql.append(" FOR UPDATE");
-        return sql.toString();
+        return buildSelectByIdSql(entity, ms, false, true);
     }
 
     public String list(Object conditionObj, MappedStatement ms) {
         @SuppressWarnings("unchecked")
         ConditionWrapper<Object> condition = (ConditionWrapper<Object>) conditionObj;
-        StringBuilder sql = new StringBuilder();
-        sql.append("SELECT ");
-        sql.append(String.join(",", MybatisUtils.getColumnsByMs(ms)));
-        sql.append(" FROM ");
-        sql.append(MybatisUtils.getTableNameByMs(ms));
-        sql.append(" WHERE ");
-        sql.append(SqlFieldUtils.buildWhereClause(condition, null));
-        sql.append(MybatisUtils.getDeleteFilterSql(ms));
-        sql.append(MybatisUtils.buildGroupByClause(condition));
-        sql.append(MybatisUtils.buildOrderByClause(condition));
-        return sql.toString();
+        return buildSelectSql(condition, ms, false);
     }
 
     public String existsByCondition(Object conditionObj, MappedStatement ms) {
         @SuppressWarnings("unchecked")
         ConditionWrapper<Object> condition = (ConditionWrapper<Object>) conditionObj;
-        StringBuilder sql = new StringBuilder();
-        sql.append("SELECT COUNT(1) FROM ");
-        sql.append(MybatisUtils.getTableNameByMs(ms));
-        sql.append(" WHERE ");
-        sql.append(SqlFieldUtils.buildWhereClause(condition, null));
-        sql.append(MybatisUtils.getDeleteFilterSql(ms));
-        sql.append(" LIMIT 1");
-        return sql.toString();
+        return buildCountSql(condition, ms, true);
     }
 
     public String count(Object conditionObj, MappedStatement ms) {
         @SuppressWarnings("unchecked")
         ConditionWrapper<Object> condition = (ConditionWrapper<Object>) conditionObj;
-        StringBuilder sql = new StringBuilder();
-        sql.append("SELECT COUNT(1) FROM ");
-        sql.append(MybatisUtils.getTableNameByMs(ms));
-        sql.append(" WHERE ");
-        sql.append(SqlFieldUtils.buildWhereClause(condition, null));
-        sql.append(MybatisUtils.getDeleteFilterSql(ms));
-        return sql.toString();
+        return buildCountSql(condition, ms, false);
     }
 
     public String logicDeleteByCondition(Object conditionObj, MappedStatement ms) {
         @SuppressWarnings("unchecked")
         ConditionWrapper<Object> condition = (ConditionWrapper<Object>) conditionObj;
-        StringBuilder sql = new StringBuilder();
-        sql.append("UPDATE ");
-        sql.append(MybatisUtils.getTableNameByMs(ms));
-        sql.append(" SET ");
-        sql.append(SqlFieldUtils.buildLogicColumns(ms));
-        sql.append(" WHERE ");
-        sql.append(SqlFieldUtils.buildWhereClause(condition, null));
-        return sql.toString();
+        return buildUpdateByConditionSql(condition, ms, true);
     }
 
     public String deleteByCondition(Object conditionObj, MappedStatement ms) {
         @SuppressWarnings("unchecked")
         ConditionWrapper<Object> condition = (ConditionWrapper<Object>) conditionObj;
-        StringBuilder sql = new StringBuilder();
-        sql.append("DELETE FROM ");
-        sql.append(MybatisUtils.getTableNameByMs(ms));
-        sql.append(" WHERE ");
-        sql.append(SqlFieldUtils.buildWhereClause(condition, null));
-        return sql.toString();
+        return buildUpdateByConditionSql(condition, ms, false);
     }
 
     public String insert(Object entity, MappedStatement ms) {
@@ -169,7 +100,7 @@ public class DynamicSQLProvider {
         sql.append(MybatisUtils.getTableNameByMs(ms));
         sql.append(" SET ");
         sql.append(SqlFieldUtils.buildSetClauseForUpdateSpec(updateSpec));
-        sql.append(" WHERE ");
+        sql.append(" WHERE 1=1");
         sql.append(SqlFieldUtils.buildWhereClause(condition, "condition"));
         return sql.toString();
     }
@@ -179,9 +110,9 @@ public class DynamicSQLProvider {
         sql.append("UPDATE ");
         sql.append(MybatisUtils.getTableNameByMs(ms));
         sql.append(" SET ");
-        sql.append(SqlFieldUtils.buildLogicColumns(ms));
+        sql.append(MybatisUtils.getLogicColumn(ms));
         sql.append(" WHERE ");
-        sql.append(SqlFieldUtils.buildWhereId(ms, entity, true));
+        sql.append(SqlFieldUtils.buildWhereId(ms, entity));
         return sql.toString();
     }
 
@@ -190,12 +121,13 @@ public class DynamicSQLProvider {
         sql.append("DELETE FROM ");
         sql.append(MybatisUtils.getTableNameByMs(ms));
         sql.append(" WHERE ");
-        sql.append(SqlFieldUtils.buildWhereId(ms, entity, true));
+        sql.append(SqlFieldUtils.buildWhereId(ms, entity));
         return sql.toString();
     }
 
 
     private String insert(Object entity, boolean selective, MappedStatement ms) {
+        FieldFillUtil.fillFields(entity, FillType.INSERT);
         StringBuilder sql = new StringBuilder();
         sql.append("INSERT INTO ");
         sql.append(MybatisUtils.getTableNameByMs(ms));
@@ -206,6 +138,7 @@ public class DynamicSQLProvider {
     }
 
     private String update(Object entity, boolean selective, MappedStatement ms) {
+        FieldFillUtil.fillFields(entity, FillType.UPDATE);
         StringBuilder sql = new StringBuilder();
         sql.append("UPDATE ");
         sql.append(MybatisUtils.getTableNameByMs(ms));
@@ -222,13 +155,72 @@ public class DynamicSQLProvider {
         Object targetEntity = paramMap.get("entity");
         Object conditionObj = paramMap.get("condition");
         ConditionWrapper<?> condition = (ConditionWrapper<?>) conditionObj;
+        FieldFillUtil.fillFields(targetEntity, FillType.UPDATE);
         StringBuilder sql = new StringBuilder();
         sql.append("UPDATE ");
         sql.append(MybatisUtils.getTableNameByMs(ms));
         sql.append(" SET ");
         sql.append(SqlFieldUtils.buildSetClause(targetEntity, selective, "entity"));
-        sql.append(" WHERE ");
+        sql.append(" WHERE 1=1");
         sql.append(SqlFieldUtils.buildWhereClause(condition, "condition"));
+        return sql.toString();
+    }
+
+    private String buildSelectSql(ConditionWrapper<?> condition, MappedStatement ms, boolean withLimit) {
+        StringBuilder sql = new StringBuilder();
+        sql.append("SELECT ");
+        sql.append(String.join(",", MybatisUtils.getColumnsByMs(ms)));
+        sql.append(" FROM ");
+        sql.append(MybatisUtils.getTableNameByMs(ms));
+        sql.append(" WHERE 1=1");
+        sql.append(SqlFieldUtils.buildWhereClause(condition, null));
+        sql.append(MybatisUtils.getDeleteFilterSql(ms));
+        sql.append(MybatisUtils.buildGroupByClause(condition));
+        sql.append(MybatisUtils.buildOrderByClause(condition));
+        if (withLimit) {
+            sql.append(" LIMIT 1");
+        }
+        return sql.toString();
+    }
+
+    private String buildSelectByIdSql(Object entity, MappedStatement ms, boolean count, boolean forUpdate) {
+        StringBuilder sql = new StringBuilder();
+        sql.append("SELECT ");
+        sql.append(count ? "COUNT(1)" : String.join(",", MybatisUtils.getColumnsByMs(ms)));
+        sql.append(" FROM ");
+        sql.append(MybatisUtils.getTableNameByMs(ms));
+        sql.append(" WHERE ");
+        sql.append(SqlFieldUtils.buildWhereId(ms, entity));
+        sql.append(MybatisUtils.getDeleteFilterSql(ms));
+        if (forUpdate) {
+            sql.append(" FOR UPDATE");
+        }
+        return sql.toString();
+    }
+
+    private String buildCountSql(ConditionWrapper<?> condition, MappedStatement ms, boolean withLimit) {
+        StringBuilder sql = new StringBuilder();
+        sql.append("SELECT COUNT(1) FROM ");
+        sql.append(MybatisUtils.getTableNameByMs(ms));
+        sql.append(" WHERE 1=1");
+        sql.append(SqlFieldUtils.buildWhereClause(condition, null));
+        sql.append(MybatisUtils.getDeleteFilterSql(ms));
+        if (withLimit) {
+            sql.append(" LIMIT 1");
+        }
+        return sql.toString();
+    }
+
+    private String buildUpdateByConditionSql(ConditionWrapper<?> condition, MappedStatement ms, boolean logicDelete) {
+        StringBuilder sql = new StringBuilder();
+        sql.append(logicDelete ? "UPDATE " : "DELETE FROM ");
+        sql.append(MybatisUtils.getTableNameByMs(ms));
+        if (logicDelete) {
+            sql.append(" SET ");
+            sql.append(MybatisUtils.getLogicColumn(ms));
+        }
+        sql.append(" WHERE 1=1");
+        sql.append(SqlFieldUtils.buildWhereClause(condition, null));
         return sql.toString();
     }
 

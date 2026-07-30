@@ -7,13 +7,14 @@ import com.wangchen.mapperx.core.conditions.ConditionWrapper;
 import org.apache.ibatis.mapping.MappedStatement;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 /**
  * MybatisUtils
@@ -53,6 +54,22 @@ public class MybatisUtils {
         // 获取 Mapper接口类名
         String mapperClassName = mappedStatementId.substring(0, lastDot);
         return resolveEntityClass(mapperClassName);
+    }
+
+    /**
+     * 根据 MappedStatement 获取实体类的 Method
+     *
+     * @param ms MappedStatement
+     * @return Method，找不到返回null
+     */
+    public static Method getMethodByMs(MappedStatement ms) {
+        String msId = ms.getId();
+        int lastDot = msId.lastIndexOf(".");
+        String mapperClassName = msId.substring(0, lastDot);
+        String methodName = msId.substring(lastDot + 1);
+
+        Class<?> mapperClass = getClass(mapperClassName);
+        return ClassUtils.getMethod(mapperClass, methodName);
     }
 
     /**

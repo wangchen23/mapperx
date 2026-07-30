@@ -1,5 +1,6 @@
 package com.wangchen.mapperx.core.sql;
 
+import com.wangchen.mapperx.core.util.LogicDeleteUtil;
 import org.apache.ibatis.mapping.BoundSql;
 import org.apache.ibatis.mapping.MappedStatement;
 import org.apache.ibatis.mapping.SqlSource;
@@ -7,6 +8,7 @@ import org.apache.ibatis.scripting.xmltags.XMLLanguageDriver;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.Map;
 
 /**
  * 1、用于在运行时通过指定的 Provider 方法动态生成 SQL 语句
@@ -43,6 +45,11 @@ public class DynamicSqlSource implements SqlSource {
         // 使用 CDATA 包裹 SQL，避免 XML 转义问题，同时保留 MyBatis 动态标签
         SqlSource sqlSource = XML_LANGUAGE_DRIVER.createSqlSource(mappedStatement.getConfiguration(),
                 sql, Object.class);
-        return sqlSource.getBoundSql(parameterObject);
+        BoundSql boundSql = sqlSource.getBoundSql(parameterObject);
+        Map<String, Object> fieldMap = LogicDeleteUtil.getFieldMap(mappedStatement);
+        if (!fieldMap.isEmpty()) {
+            fieldMap.forEach(boundSql::setAdditionalParameter);
+        }
+        return boundSql;
     }
 }

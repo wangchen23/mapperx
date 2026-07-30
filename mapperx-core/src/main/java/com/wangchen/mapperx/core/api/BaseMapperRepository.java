@@ -1,6 +1,7 @@
 package com.wangchen.mapperx.core.api;
 
 import com.wangchen.mapperx.core.annotation.Batch;
+import com.wangchen.mapperx.core.annotation.CondOp;
 import com.wangchen.mapperx.core.annotation.MapMethod;
 import com.wangchen.mapperx.core.annotation.SqlCommand;
 import com.wangchen.mapperx.core.conditions.ConditionWrapper;
@@ -113,6 +114,7 @@ public interface BaseMapperRepository<T, K> extends BaseRepository<T, K> {
 
     @Override
     @SqlCommand(SqlCommandType.UPDATE)
+    @CondOp
     int logicDelete(K id);
 
     @Override
@@ -122,6 +124,7 @@ public interface BaseMapperRepository<T, K> extends BaseRepository<T, K> {
 
     @Override
     @SqlCommand(SqlCommandType.UPDATE)
+    @CondOp
     int logicDeleteByCondition(ConditionWrapper<T> condition);
 
     @Override

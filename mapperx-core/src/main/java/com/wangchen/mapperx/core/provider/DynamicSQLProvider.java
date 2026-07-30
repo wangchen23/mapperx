@@ -98,7 +98,7 @@ public class DynamicSQLProvider {
 
         // 自动填充：获取实体类，处理需要自动填充的字段
         Class<?> entityClass = MybatisUtils.getEntityClassByMs(ms);
-        FieldFillUtil.fillUpdateSpec(updateSpec, entityClass, FillType.UPDATE);
+        FieldFillUtil.fillUpdateSpec(updateSpec, entityClass);
 
         StringBuilder sql = new StringBuilder();
         sql.append("UPDATE ");
@@ -121,7 +121,7 @@ public class DynamicSQLProvider {
         sql.append(" SET ");
         sql.append(MybatisUtils.getLogicColumn(ms));
         sql.append(", ");
-        sql.append(FieldFillUtil.buildFillSql(entityClass, FillType.UPDATE));
+        sql.append(FieldFillUtil.buildFillSql(entityClass));
         sql.append(" WHERE ");
         sql.append(SqlFieldUtils.buildWhereId(entityClass, entity));
         sql.append(MybatisUtils.getDeleteFilterSql(ms));
@@ -130,7 +130,7 @@ public class DynamicSQLProvider {
 
     public String delete(Object entity, MappedStatement ms) {
         Class<?> entityClass = MybatisUtils.getEntityClassByMs(ms);
-        
+
         StringBuilder sql = new StringBuilder();
         sql.append("DELETE FROM ");
         sql.append(MybatisUtils.getTableNameByMs(ms));
@@ -208,7 +208,7 @@ public class DynamicSQLProvider {
 
     private String buildSelectByIdSql(Object entity, MappedStatement ms, boolean count, boolean forUpdate) {
         Class<?> entityClass = MybatisUtils.getEntityClassByMs(ms);
-        
+
         StringBuilder sql = new StringBuilder();
         sql.append("SELECT ");
         sql.append(count ? "COUNT(1)" : String.join(",", MybatisUtils.getColumnsByMs(ms)));
@@ -247,7 +247,7 @@ public class DynamicSQLProvider {
             sql.append(" SET ");
             sql.append(MybatisUtils.getLogicColumn(ms));
             sql.append(", ");
-            sql.append(FieldFillUtil.buildFillSql(entityClass, FillType.UPDATE));
+            sql.append(FieldFillUtil.buildFillSql(entityClass));
         }
         sql.append(" WHERE 1=1");
         // todo 默认过滤 无

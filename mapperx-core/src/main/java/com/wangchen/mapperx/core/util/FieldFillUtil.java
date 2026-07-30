@@ -45,9 +45,8 @@ public class FieldFillUtil {
      *
      * @param updateSpec    更新集合
      * @param entityClass   实体Class
-     * @param operationType 操作类型
      */
-    public static void fillUpdateSpec(UpdateSpec<?> updateSpec, Class<?> entityClass, FillType operationType) {
+    public static void fillUpdateSpec(UpdateSpec<?> updateSpec, Class<?> entityClass) {
         Map<String, Object> updateMap = updateSpec.getUpdates();
         List<Field> fieldList = ClassUtils.getFieldsByAnnotation(entityClass, Column.class);
         // 仅创建一次临时实例
@@ -58,66 +57,91 @@ public class FieldFillUtil {
             FillType fillRule = columnAnn.fillType();
 
             // 判断是否执行填充
-            if (fillRule != FillType.INSERT_UPDATE && fillRule != operationType) {
+            if (fillRule != FillType.INSERT_UPDATE && fillRule != FillType.UPDATE) {
                 continue;
             }
 
-            String propertyName = field.getName();
+            String columnName = SqlFieldUtils.getColumnName(field);
             // 重点：如果updateSpec已经存在该属性，跳过填充
-            if (updateMap.containsKey(propertyName)) {
+            if (updateMap.containsKey(columnName)) {
                 continue;
             }
 
             Object fillValue;
             if (tempInstance != null) {
-                fillValue = invokeFillMethod(tempInstance, field, operationType);
+                fillValue = invokeFillMethod(tempInstance, field, FillType.UPDATE);
             } else {
                 // 无无参构造器，仅尝试全局静态方法
-                fillValue = tryInvokeStaticMethod(field, operationType);
+                fillValue = tryInvokeStaticMethod(field, FillType.UPDATE);
             }
 
             if (fillValue != null) {
                 // 注意！如果updateSpec的key是数据库列名，替换为 SqlFieldUtils.getColumnName(field)
-                updateSpec.set(propertyName, fillValue);
+                updateSpec.set(columnName, fillValue);
             }
         }
     }
 
     /**
-     * 根据实体类和操作类型生成填充字段的 SQL 片段（直接拼接值，不使用占位符）
-     * 用于 logicDelete 等场景
+     * 根据实体类和操作类型生成填充字段的 SQL 片段（使用占位符）
+     * 适用场景：@CondOp 逻辑删除动态SQL，无实体入参，无法拦截实体对象setter，
      *
-     * @param entityClass   实体类
-     * @param operationType 操作类型
-     * @return SQL 片段，如 "update_time = '2026-07-30 10:00:00', update_user = 1"
+     * @param entityClass 实体类
+     * @return SQL 片段，如 "update_time = #{updateTime}, update_user = #{updateUser}"
      */
-    public static String buildFillSql(Class<?> entityClass, FillType operationType) {
+    public static String buildFillSql(Class<?> entityClass) {
         List<Field> fieldList = ClassUtils.getFieldsByAnnotation(entityClass, Column.class);
-        Object tempInstance = createTempInstance(entityClass);
 
         List<String> setItems = new ArrayList<>();
         for (Field field : fieldList) {
             Column columnAnn = field.getAnnotation(Column.class);
             FillType fillRule = columnAnn.fillType();
 
-            // 判断是否执行填充
-            if (fillRule != FillType.INSERT_UPDATE && fillRule != operationType) {
+            // 判断是否执行填充,由于是逻辑删除所以是修改操作,字段没有设置修改填充则跳过
+            if (fillRule != FillType.INSERT_UPDATE && fillRule != FillType.UPDATE) {
+                continue;
+            }
+
+            String columnName = SqlFieldUtils.getColumnName(field);
+            String fieldName = "@fill." + field.getName();
+            setItems.add(columnName + " = #{" + fieldName + "}");
+        }
+        return String.join(", ", setItems);
+    }
+
+    /**
+     * 根据实体类，获取逻辑删除场景下需要自动填充的字段键值对
+     * <p>适用场景：@CondOp 逻辑删除动态SQL，无实体入参，无法拦截实体对象setter，
+     * 提前解析实体注解规则，生成待塞入BoundSql附加参数</p>
+     * <p>填充规则说明：逻辑删除本质为UPDATE操作，仅匹配标记为【UPDATE / INSERT_UPDATE】的字段</p>
+     *
+     * @param map         key=实体属性名，value=填充后真实值；若无匹配填充字段返回空Map
+     * @param entityClass 目标实体Class
+     */
+    public static void getFillValue(Map<String, Object> map, Class<?> entityClass) {
+        List<Field> fieldList = ClassUtils.getFieldsByAnnotation(entityClass, Column.class);
+        // 仅创建一次临时实例
+        Object tempInstance = createTempInstance(entityClass);
+
+        for (Field field : fieldList) {
+            Column columnAnn = field.getAnnotation(Column.class);
+            FillType fillRule = columnAnn.fillType();
+
+            // 判断是否执行填充,由于是逻辑删除所以是修改操作,字段没有设置修改填充则跳过
+            if (fillRule != FillType.INSERT_UPDATE && fillRule != FillType.UPDATE) {
                 continue;
             }
 
             Object fillValue;
             if (tempInstance != null) {
-                fillValue = invokeFillMethod(tempInstance, field, operationType);
+                fillValue = invokeFillMethod(tempInstance, field, FillType.UPDATE);
             } else {
-                fillValue = tryInvokeStaticMethod(field, operationType);
+                // 无无参构造器，仅尝试全局静态方法
+                fillValue = tryInvokeStaticMethod(field, FillType.UPDATE);
             }
-
-            if (fillValue != null) {
-                String columnName = SqlFieldUtils.getColumnName(field);
-                setItems.add(columnName + " = " + fillValue);
-            }
+            String fieldName = "@fill." + field.getName();
+            map.put(fieldName, fillValue);
         }
-        return String.join(", ", setItems);
     }
 
     private static List<Field> getFillFields(Object target, FillType operationType) {

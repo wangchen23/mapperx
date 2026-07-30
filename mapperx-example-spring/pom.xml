@@ -16,7 +16,7 @@
         <dependency>
             <groupId>io.github.wangchen23</groupId>
             <artifactId>mapperx-spring-boot-starter</artifactId>
-            <version>1.4.1</version>
+            <version>1.5.1</version>
         </dependency>
         
         <!-- MyBatis + Spring Boot -->

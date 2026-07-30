@@ -2,6 +2,7 @@ package com.wangchen.mapperx.example.entity;
 
 
 import com.wangchen.mapperx.core.annotation.Column;
+import com.wangchen.mapperx.core.annotation.FillType;
 import com.wangchen.mapperx.core.annotation.IdStrategy;
 import com.wangchen.mapperx.core.annotation.LogicDelete;
 import com.wangchen.mapperx.core.annotation.PrimaryKey;
@@ -29,6 +30,11 @@ public class UserInfoDO {
 
     private Integer age;
 
+    public LocalDateTime getDateTime() {
+        return LocalDateTime.now();
+    }
+
+    @Column(fillType= FillType.INSERT_UPDATE,fillMethod = "getDateTime")
     private LocalDateTime dateTime;
 
     private LocalDateTime dateTimeEnd;

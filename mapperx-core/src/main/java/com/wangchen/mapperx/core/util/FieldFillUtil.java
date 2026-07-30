@@ -83,6 +83,43 @@ public class FieldFillUtil {
         }
     }
 
+    /**
+     * 根据实体类和操作类型生成填充字段的 SQL 片段（直接拼接值，不使用占位符）
+     * 用于 logicDelete 等场景
+     *
+     * @param entityClass   实体类
+     * @param operationType 操作类型
+     * @return SQL 片段，如 "update_time = '2026-07-30 10:00:00', update_user = 1"
+     */
+    public static String buildFillSql(Class<?> entityClass, FillType operationType) {
+        List<Field> fieldList = ClassUtils.getFieldsByAnnotation(entityClass, Column.class);
+        Object tempInstance = createTempInstance(entityClass);
+
+        List<String> setItems = new ArrayList<>();
+        for (Field field : fieldList) {
+            Column columnAnn = field.getAnnotation(Column.class);
+            FillType fillRule = columnAnn.fillType();
+
+            // 判断是否执行填充
+            if (fillRule != FillType.INSERT_UPDATE && fillRule != operationType) {
+                continue;
+            }
+
+            Object fillValue;
+            if (tempInstance != null) {
+                fillValue = invokeFillMethod(tempInstance, field, operationType);
+            } else {
+                fillValue = tryInvokeStaticMethod(field, operationType);
+            }
+
+            if (fillValue != null) {
+                String columnName = SqlFieldUtils.getColumnName(field);
+                setItems.add(columnName + " = " + fillValue);
+            }
+        }
+        return String.join(", ", setItems);
+    }
+
     private static List<Field> getFillFields(Object target, FillType operationType) {
         Class<?> clazz = target.getClass();
         List<Field> allColumnFields = ClassUtils.getFieldsByAnnotation(clazz, Column.class);

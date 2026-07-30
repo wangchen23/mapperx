@@ -540,4 +540,70 @@ public class UserInfoMapperTest {
         int result = userInfoMapper.batchUpdateSelective(entities);
         assertEquals(3, result);
     }
+
+    /**
+     * 测试 insert 时自动填充 dateTime
+     */
+    @Test
+    public void testInsertAutoFill() {
+        UserInfoDO entity = new UserInfoDO();
+        entity.setUserName("自动填充测试");
+        entity.setAge(25);
+
+        userInfoMapper.insertSelective(entity);
+
+        // 验证自动填充生效
+        UserInfoDO result = userInfoMapper.getById(entity.getId());
+        assertNotNull(result.getDateTime());  // dateTime 应该被自动填充
+    }
+
+    /**
+     * 测试 updateByConditionWithFields 时自动填充
+     */
+    @Test
+    public void testUpdateByConditionWithFieldsAutoFill() {
+        // 先插入一条数据
+        UserInfoDO entity = new UserInfoDO();
+        entity.setUserName("AutoFillUpdate测试");
+        entity.setAge(95);
+        userInfoMapper.insertSelective(entity);
+
+        // 指定字段更新（dateTime 应该被自动填充）
+        UpdateSpec<UserInfoDO> updateSpec = new UpdateSpec<>();
+        updateSpec.set(UserInfoDO::getAge, 96);
+
+        ConditionWrapper<UserInfoDO> condition = new ConditionWrapper<>();
+        condition.eq(UserInfoDO::getUserName, "AutoFillUpdate测试");
+
+        userInfoMapper.updateByConditionWithFields(updateSpec, condition);
+
+        // 验证自动填充生效
+        UserInfoDO result = userInfoMapper.getById(entity.getId());
+        assertNotNull(result.getDateTime());  // dateTime 应该被自动填充
+    }
+
+    /**
+     * 测试逻辑删除后数据被过滤
+     */
+    @Test
+    public void testLogicDeleteFilter() {
+        // 插入两条数据
+        UserInfoDO entity1 = new UserInfoDO();
+        entity1.setUserName("逻辑过滤测试1");
+        entity1.setAge(30);
+        userInfoMapper.insertSelective(entity1);
+
+        UserInfoDO entity2 = new UserInfoDO();
+        entity2.setUserName("逻辑过滤测试2");
+        entity2.setAge(31);
+        userInfoMapper.insertSelective(entity2);
+
+        // 逻辑删除一条
+        userInfoMapper.logicDelete(entity1.getId());
+
+        // 验证 list 中不包含已删除的数据
+        List<UserInfoDO> list = userInfoMapper.list(new ConditionWrapper<>());
+        assertTrue(list.stream().noneMatch(e -> e.getId().equals(entity1.getId())));
+        assertTrue(list.stream().anyMatch(e -> e.getId().equals(entity2.getId())));
+    }
 }

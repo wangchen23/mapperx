@@ -88,10 +88,11 @@ public class ClassUtils {
 
     /**
      * 获取类中指定参数类型的public方法（带缓存）
+     * 若 paramTypes 为空，则获取任意一个同名方法（不关心参数类型）
      *
      * @param clazz      目标类
      * @param methodName 方法名
-     * @param paramTypes 参数类型数组，空数组代表无参
+     * @param paramTypes 参数类型数组，空数组代表不精确匹配
      * @return Method，找不到返回null
      */
     public static Method getMethod(Class<?> clazz, String methodName, Class<?>... paramTypes) {
@@ -103,6 +104,16 @@ public class ClassUtils {
         String key = keySb.toString();
 
         return METHOD_CACHE.computeIfAbsent(key, k -> {
+            // paramTypes 为空，不精确匹配
+            if (paramTypes.length == 0) {
+                for (Method m : clazz.getMethods()) {
+                    if (m.getName().equals(methodName)) {
+                        return m;
+                    }
+                }
+                return null;
+            }
+            // 精确匹配
             try {
                 return clazz.getMethod(methodName, paramTypes);
             } catch (Exception e) {

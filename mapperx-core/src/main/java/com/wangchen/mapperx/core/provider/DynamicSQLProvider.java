@@ -114,7 +114,7 @@ public class DynamicSQLProvider {
 
     public String logicDelete(Object entity, MappedStatement ms) {
         Class<?> entityClass = MybatisUtils.getEntityClassByMs(ms);
-        
+
         StringBuilder sql = new StringBuilder();
         sql.append("UPDATE ");
         sql.append(MybatisUtils.getTableNameByMs(ms));
@@ -123,17 +123,19 @@ public class DynamicSQLProvider {
         sql.append(", ");
         sql.append(FieldFillUtil.buildFillSql(entityClass, FillType.UPDATE));
         sql.append(" WHERE ");
-        sql.append(SqlFieldUtils.buildWhereId(entity));
+        sql.append(SqlFieldUtils.buildWhereId(entityClass, entity));
         sql.append(MybatisUtils.getDeleteFilterSql(ms));
         return sql.toString();
     }
 
     public String delete(Object entity, MappedStatement ms) {
+        Class<?> entityClass = MybatisUtils.getEntityClassByMs(ms);
+        
         StringBuilder sql = new StringBuilder();
         sql.append("DELETE FROM ");
         sql.append(MybatisUtils.getTableNameByMs(ms));
         sql.append(" WHERE ");
-        sql.append(SqlFieldUtils.buildWhereId(entity));
+        sql.append(SqlFieldUtils.buildWhereId(entityClass, entity));
         sql.append(MybatisUtils.getDeleteFilterSql(ms));
         return sql.toString();
     }
@@ -141,7 +143,7 @@ public class DynamicSQLProvider {
 
     private String insert(Object entity, boolean selective, MappedStatement ms) {
         FieldFillUtil.fillFields(entity, FillType.INSERT);
-        
+
         StringBuilder sql = new StringBuilder();
         sql.append("INSERT INTO ");
         sql.append(MybatisUtils.getTableNameByMs(ms));
@@ -153,7 +155,7 @@ public class DynamicSQLProvider {
 
     private String update(Object entity, boolean selective, MappedStatement ms) {
         FieldFillUtil.fillFields(entity, FillType.UPDATE);
-        
+
         StringBuilder sql = new StringBuilder();
         sql.append("UPDATE ");
         sql.append(MybatisUtils.getTableNameByMs(ms));
@@ -173,7 +175,7 @@ public class DynamicSQLProvider {
         Object conditionObj = paramMap.get("condition");
         ConditionWrapper<?> condition = (ConditionWrapper<?>) conditionObj;
         FieldFillUtil.fillFields(targetEntity, FillType.UPDATE);
-        
+
         StringBuilder sql = new StringBuilder();
         sql.append("UPDATE ");
         sql.append(MybatisUtils.getTableNameByMs(ms));
@@ -205,13 +207,15 @@ public class DynamicSQLProvider {
     }
 
     private String buildSelectByIdSql(Object entity, MappedStatement ms, boolean count, boolean forUpdate) {
+        Class<?> entityClass = MybatisUtils.getEntityClassByMs(ms);
+        
         StringBuilder sql = new StringBuilder();
         sql.append("SELECT ");
         sql.append(count ? "COUNT(1)" : String.join(",", MybatisUtils.getColumnsByMs(ms)));
         sql.append(" FROM ");
         sql.append(MybatisUtils.getTableNameByMs(ms));
         sql.append(" WHERE ");
-        sql.append(SqlFieldUtils.buildWhereId(entity));
+        sql.append(SqlFieldUtils.buildWhereId(entityClass, entity));
         sql.append(MybatisUtils.getDeleteFilterSql(ms));
         if (forUpdate) {
             sql.append(" FOR UPDATE");

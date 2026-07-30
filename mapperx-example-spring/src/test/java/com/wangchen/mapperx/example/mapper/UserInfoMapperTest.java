@@ -105,10 +105,11 @@ public class UserInfoMapperTest {
         userInfoMapper.insertSelective(entity);
 
         // 测试存在
-        assertTrue(userInfoMapper.existsById(entity.getId()));
-
+        boolean exists = userInfoMapper.existsById(entity.getId());
+        assertTrue(exists);
         // 测试不存在
-        assertFalse(userInfoMapper.existsById(999999L));
+        boolean exists1 = userInfoMapper.existsById(999999L);
+        assertFalse(exists1);
     }
 
     /**
@@ -136,13 +137,13 @@ public class UserInfoMapperTest {
      */
     @Test
     public void testList() {
-        // 先插入几条数据
-        //for (int i = 0; i < 3; i++) {
-        //    UserInfoDO entity = new UserInfoDO();
-        //    entity.setUserName("list测试_" + i);
-        //    entity.setAge(40 + i);
-        //    userInfoMapper.insertSelective(entity);
-        //}
+        //先插入几条数据
+        for (int i = 0; i < 3; i++) {
+            UserInfoDO entity = new UserInfoDO();
+            entity.setUserName("list测试_" + i);
+            entity.setAge(40 + i);
+            userInfoMapper.insertSelective(entity);
+        }
 
         // 条件查询
         ConditionWrapper<UserInfoDO> wrapper = new ConditionWrapper<>();

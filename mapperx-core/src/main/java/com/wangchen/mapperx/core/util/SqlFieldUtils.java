@@ -149,6 +149,30 @@ public class SqlFieldUtils {
     }
 
     /**
+     * 没有实体类只有主键
+     * 生成 WHERE 条件：id = #{id}
+     */
+    public static String buildWhereId(Class<?> entityClass, Object entity) {
+        if (entity == null) {
+            throw new IllegalArgumentException("Primary key is null");
+        }
+        Map<String, Field> fields = ClassUtils.getFieldMap(entityClass);
+        // 主键
+        for (Field field : fields.values()) {
+            if (isIgnoredField(field)) {
+                continue;
+            }
+            String fieldName = field.getName();
+            String columnName = getColumnName(field);
+            if (field.isAnnotationPresent(PrimaryKey.class)) {
+                return columnName + " = #{" + fieldName + "}";
+            }
+        }
+        return "";
+    }
+
+    /**
+     * 有实体类
      * 生成 WHERE 条件：id = #{id}
      */
     public static String buildWhereId(Object entity) {
